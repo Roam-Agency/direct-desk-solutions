@@ -19,7 +19,7 @@
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script src="https://unpkg.com/lucide@0.263.1/dist/umd/lucide.js"></script>
 <style>
   body { font-family: 'Archivo', system-ui; margin: 0; -webkit-font-smoothing: antialiased; }
   * { -webkit-font-smoothing: antialiased; }
@@ -48,8 +48,9 @@ const { useState, useMemo, useEffect } = React;
 // =============================================================================
 // ICON HELPER
 // =============================================================================
+const toPascal = (s) => s.split("-").map(p => p ? p[0].toUpperCase() + p.slice(1) : "").join("");
 const Icon = ({ name, size = 16, className = "", style = {}, fill = "none", stroke = "currentColor" }) => {
-  const node = lucide.icons[name];
+  const node = (lucide.icons && (lucide.icons[name] || lucide.icons[toPascal(name)])) || null;
   if (!node) return null;
   const [, , children] = node;
   return (
@@ -200,9 +201,18 @@ const SiteHeader = ({ go, basketCount = 3 }) => {
         <div className="lg:hidden flex items-center justify-between px-4 py-3 gap-3">
           <button onClick={() => setNavOpen(true)} aria-label="Open menu" className="w-11 h-11 -ml-2 flex items-center justify-center"><Icon name="menu" size={22} /></button>
           <button onClick={() => go("home")} aria-label="Direct Desk Solutions home" className="flex-1 flex justify-center"><Logo className="h-7" /></button>
-          <button onClick={() => go("basket")} aria-label={`Basket, ${basketCount} items`} className="w-11 h-11 -mr-2 flex items-center justify-center relative text-black">
-            <Icon name="shopping-bag" size={20} />
-            {basketCount > 0 && <span style={{ background: BRAND_RED }} className="absolute top-1 right-1 text-white text-[10px] font-bold w-[16px] h-[16px] rounded-full flex items-center justify-center">{basketCount}</span>}
+          <button onClick={() => go("basket")} aria-label={`Basket, ${basketCount} items`} className="w-11 h-11 -mr-1 flex items-center justify-center relative text-black active:bg-stone-100 rounded-full">
+            {/* Inline basket SVG — guaranteed to render even if lucide CDN changes */}
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
+              <path d="M3 6h18" />
+              <path d="M16 10a4 4 0 0 1-8 0" />
+            </svg>
+            {basketCount > 0 && (
+              <span aria-hidden="true" style={{ background: BRAND_RED }} className="absolute -top-0.5 -right-0.5 text-white text-[10px] font-bold leading-none min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center ring-2 ring-white">
+                {basketCount}
+              </span>
+            )}
           </button>
         </div>
 
