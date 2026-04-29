@@ -200,7 +200,7 @@ const SiteHeader = ({ go, basketCount = 3 }) => {
         <div className="lg:hidden flex items-center justify-between px-4 py-3 gap-3">
           <button onClick={() => setNavOpen(true)} aria-label="Open menu" className="w-11 h-11 -ml-2 flex items-center justify-center"><Icon name="menu" size={22} /></button>
           <button onClick={() => go("home")} aria-label="Direct Desk Solutions home" className="flex-1 flex justify-center"><Logo className="h-7" /></button>
-          <button onClick={() => go("basket")} aria-label={`Basket, ${basketCount} items`} className="w-11 h-11 -mr-2 flex items-center justify-center relative">
+          <button onClick={() => go("basket")} aria-label={`Basket, ${basketCount} items`} className="w-11 h-11 -mr-2 flex items-center justify-center relative text-black">
             <Icon name="shopping-bag" size={20} />
             {basketCount > 0 && <span style={{ background: BRAND_RED }} className="absolute top-1 right-1 text-white text-[10px] font-bold w-[16px] h-[16px] rounded-full flex items-center justify-center">{basketCount}</span>}
           </button>
