@@ -1,0 +1,1845 @@
+const { useState, useMemo, useEffect } = React;
+
+// =============================================================================
+// ICON HELPER
+// =============================================================================
+const Icon = ({ name, size = 16, className = "", style = {}, fill = "none", stroke = "currentColor" }) => {
+  const node = lucide.icons[name];
+  if (!node) return null;
+  const [, , children] = node;
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24"
+      fill={fill} stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+      className={className} style={style}>
+      {children.map((c, i) => {
+        const [tag, attrs] = c;
+        return React.createElement(tag, { key: i, ...attrs });
+      })}
+    </svg>
+  );
+};
+
+// =============================================================================
+// TOKENS
+// =============================================================================
+const BRAND_RED = "#E5202A";
+const INK = "#0A0A0A";
+const PAPER = "#FAFAF7";
+const RULE = "#E8E4DC";
+
+const Logo = ({ className = "h-9" }) => (
+  <svg viewBox="0 0 340 110" className={className} xmlns="http://www.w3.org/2000/svg">
+    <polygon points="5,10 100,55 5,100 25,55" fill={BRAND_RED} />
+    <polygon points="25,55 60,55 45,75" fill="#fff" />
+    <text x="115" y="68" fontFamily="'Archivo Black', system-ui" fontSize="58" fontWeight="900" fill={INK} fontStyle="italic">Direct</text>
+    <text x="115" y="98" fontFamily="'Archivo', system-ui" fontSize="20" fontWeight="800" letterSpacing="3" fill={INK}>DESK SOLUTIONS</text>
+  </svg>
+);
+
+// =============================================================================
+// DATA
+// =============================================================================
+const NEW_CATEGORIES = [
+  { name: "Desks", count: 142 }, { name: "Office Chairs", count: 89 },
+  { name: "Storage", count: 67 }, { name: "Meeting Tables", count: 34 },
+  { name: "Reception", count: 22 }, { name: "Acoustic & Booths", count: 18 },
+];
+const USED_CATEGORIES = [
+  { name: "Used Desks", count: 47 }, { name: "Used Chairs", count: 63 },
+  { name: "Used Storage", count: 28 }, { name: "Used Meeting", count: 12 },
+  { name: "Job Lots", count: 9 }, { name: "Clearance", count: 31 },
+];
+const PRODUCTS = [
+  { id: 1, name: "Impulse 1600mm Straight Desk", sub: "Beech top · Silver post leg", price: 295.92, img: "https://images.unsplash.com/photo-1518455027359-f3f8164ba6bd?w=600&h=600&fit=crop", condition: "new", stock: 24, category: "Desks" },
+  { id: 2, name: "Herman Miller Aeron Chair", sub: "Size B · Graphite · Refurbished", price: 485.00, was: 1295.00, img: "https://images.unsplash.com/photo-1580480055273-228ff5388ef8?w=600&h=600&fit=crop", condition: "used", stock: 3, category: "Chairs" },
+  { id: 3, name: "Arc Pedestal — 3 Drawer", sub: "White · Lockable · Mobile", price: 156.40, img: "https://images.unsplash.com/photo-1631679706909-1844bbd07221?w=600&h=600&fit=crop", condition: "new", stock: 41, category: "Storage" },
+  { id: 4, name: "Steelcase Boardroom Table", sub: "2400mm · Walnut · Cable mgmt", price: 720.00, was: 2400.00, img: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=600&h=600&fit=crop", condition: "used", stock: 1, category: "Meeting" },
+  { id: 5, name: "Bench Desk 1400mm", sub: "Oak top · White frame · Twin", price: 412.50, img: "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=600&h=600&fit=crop", condition: "new", stock: 18, category: "Desks" },
+  { id: 6, name: "Mesh Task Chair — Posture", sub: "Adjustable lumbar · 3D arms", price: 189.00, img: "https://images.unsplash.com/photo-1592078615290-033ee584e267?w=600&h=600&fit=crop", condition: "new", stock: 56, category: "Chairs" },
+  { id: 7, name: "Tambour Cupboard 1800mm", sub: "Used · Light wear · Beech", price: 145.00, was: 520.00, img: "https://images.unsplash.com/photo-1524758631624-e2822e304c36?w=600&h=600&fit=crop", condition: "used", stock: 4, category: "Storage" },
+  { id: 8, name: "Acoustic Booth — 4 Person", sub: "Charcoal felt · Power & USB-C", price: 4950.00, img: "https://images.unsplash.com/photo-1604328698692-f76ea9498e76?w=600&h=600&fit=crop", condition: "new", stock: 6, category: "Booths" },
+];
+const CRM_PRODUCTS = [
+  { sku: "DDS-IMP-1600", name: "Impulse 1600mm Straight Desk", price: 295.92, stock: 24, status: "Live", images: 5, condition: "New", updated: "2h ago" },
+  { sku: "DDS-USED-AER-014", name: "Herman Miller Aeron — Refurb", price: 485.00, stock: 3, status: "Live", images: 12, condition: "Used · A", updated: "1d ago" },
+  { sku: "DDS-PED-3D-W", name: "Arc Pedestal — 3 Drawer White", price: 156.40, stock: 41, status: "Live", images: 4, condition: "New", updated: "3d ago" },
+  { sku: "DDS-USED-STC-002", name: "Steelcase Boardroom 2.4m", price: 720.00, stock: 1, status: "Draft", images: 8, condition: "Used · B", updated: "12m ago" },
+  { sku: "DDS-BEN-1400", name: "Bench Desk 1400mm Oak/White", price: 412.50, stock: 18, status: "Live", images: 6, condition: "New", updated: "5d ago" },
+  { sku: "DDS-CHR-MESH-01", name: "Mesh Task Chair — Posture", price: 189.00, stock: 56, status: "Live", images: 7, condition: "New", updated: "1w ago" },
+];
+
+const fmt = (n) => "£" + n.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const Pill = ({ children, tone = "ink" }) => {
+  const tones = { ink: "bg-black text-white", red: "text-white", paper: "bg-white text-black border border-black",
+    muted: "bg-stone-100 text-stone-700", green: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+    amber: "bg-amber-50 text-amber-800 border border-amber-200" };
+  const style = tone === "red" ? { background: BRAND_RED } : {};
+  return (<span style={style} className={`inline-flex items-center px-2 py-0.5 text-[10px] font-bold tracking-[0.12em] uppercase ${tones[tone]}`}>{children}</span>);
+};
+
+// =============================================================================
+// MOBILE NAV DRAWER
+// =============================================================================
+const MobileNavDrawer = ({ open, onClose, go }) => {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[100] lg:hidden fade-in">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="absolute inset-y-0 left-0 w-[88%] max-w-[380px] bg-white flex flex-col slide-up" style={{ animation: "slideUp 0.25s ease-out" }}>
+        <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: RULE }}>
+          <Logo className="h-9" />
+          <button onClick={onClose} className="w-9 h-9 flex items-center justify-center"><Icon name="x" size={20} /></button>
+        </div>
+        <div className="p-5 border-b" style={{ borderColor: RULE }}>
+          <div className="bg-stone-100 flex items-center">
+            <Icon name="search" size={18} className="ml-4 text-stone-500" />
+            <input placeholder="Search products…" className="flex-1 px-3 py-3.5 bg-transparent outline-none text-[14px]" />
+          </div>
+        </div>
+        <nav className="flex-1 overflow-y-auto">
+          <button onClick={() => { go("new"); onClose(); }} className="w-full p-5 flex justify-between items-center border-b text-left" style={{ borderColor: RULE }}>
+            <div>
+              <div className="text-[16px] font-bold">Shop New</div>
+              <div className="text-[12px] text-stone-500 mt-0.5">372 products in stock</div>
+            </div>
+            <Icon name="chevron-right" size={18} />
+          </button>
+          <button onClick={() => { go("used"); onClose(); }} className="w-full p-5 flex justify-between items-center border-b text-left" style={{ borderColor: RULE }}>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[16px] font-bold">Shop Used</span>
+                <span style={{ background: BRAND_RED }} className="text-white text-[9px] px-1.5 py-0.5 font-bold">SAVE 70%</span>
+              </div>
+              <div className="text-[12px] text-stone-500 mt-0.5">190 pre-owned items</div>
+            </div>
+            <Icon name="chevron-right" size={18} />
+          </button>
+          {["Bundles", "Office Planning", "Trade Account", "Help & FAQ"].map(l => (
+            <button key={l} className="w-full p-5 flex justify-between items-center border-b text-left text-[15px] font-semibold" style={{ borderColor: RULE }}>
+              {l} <Icon name="chevron-right" size={16} className="text-stone-400" />
+            </button>
+          ))}
+          <div className="p-5 mt-4 bg-stone-50">
+            <div className="text-[10px] tracking-[0.18em] uppercase text-stone-500 mb-3">Get in touch</div>
+            <a className="flex items-center gap-3 py-2"><Icon name="phone" size={16} /> <span className="text-[14px]">0744 465 1200</span></a>
+            <a className="flex items-center gap-3 py-2"><Icon name="mail" size={16} /> <span className="text-[14px]">hello@directdesk.co.uk</span></a>
+            <div className="text-[12px] text-stone-500 mt-2">Mon–Fri · 9:00–17:30</div>
+          </div>
+        </nav>
+      </div>
+    </div>
+  );
+};
+
+// =============================================================================
+// SITE HEADER (responsive)
+// =============================================================================
+const SiteHeader = ({ go, basketCount = 3 }) => {
+  const [navOpen, setNavOpen] = useState(false);
+  return (
+    <>
+      <header className="bg-white border-b sticky top-[44px] lg:top-0 z-40" style={{ borderColor: RULE }}>
+        {/* Top strip — desktop only */}
+        <div className="hidden lg:block bg-black text-white text-[11px] tracking-[0.18em] uppercase">
+          <div className="max-w-[1400px] mx-auto px-8 py-2 flex justify-between">
+            <span>Free UK Mainland Delivery on orders over £500</span>
+            <span className="flex gap-6">
+              <span className="flex items-center gap-1.5"><Icon name="phone" size={11} /> 0744 465 1200</span>
+              <span>Mon–Fri · 9:00–17:30</span>
+            </span>
+          </div>
+        </div>
+
+        {/* Mobile header bar */}
+        <div className="lg:hidden flex items-center justify-between px-4 py-3 gap-3">
+          <button onClick={() => setNavOpen(true)} className="w-10 h-10 -ml-2 flex items-center justify-center"><Icon name="menu" size={22} /></button>
+          <button onClick={() => go("home")} className="flex-1 flex justify-center"><Logo className="h-7" /></button>
+          <button onClick={() => go("basket")} className="w-10 h-10 -mr-2 flex items-center justify-center relative">
+            <Icon name="shopping-bag" size={20} />
+            {basketCount > 0 && <span style={{ background: BRAND_RED }} className="absolute top-1 right-1 text-white text-[10px] font-bold w-[16px] h-[16px] rounded-full flex items-center justify-center">{basketCount}</span>}
+          </button>
+        </div>
+
+        {/* Desktop header */}
+        <div className="hidden lg:block">
+          <div className="max-w-[1400px] mx-auto px-8 py-5 flex items-center gap-10">
+            <button onClick={() => go("home")} className="shrink-0"><Logo className="h-11" /></button>
+            <div className="flex-1 max-w-2xl relative">
+              <Icon name="search" size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
+              <input placeholder="Search desks, chairs, storage…" className="w-full pl-11 pr-24 py-3 bg-stone-100 border border-transparent focus:border-black focus:bg-white outline-none text-[14px]" />
+              <button className="absolute right-1.5 top-1.5 bottom-1.5 px-5 text-white text-[12px] font-bold tracking-wider uppercase" style={{ background: INK }}>Search</button>
+            </div>
+            <nav className="flex items-center gap-7 text-[13px] font-medium">
+              <button className="hover:opacity-60 flex items-center gap-1.5"><Icon name="user" size={17} /> Account</button>
+              <button onClick={() => go("basket")} className="hover:opacity-60 flex items-center gap-1.5 relative">
+                <Icon name="shopping-bag" size={17} /> Basket
+                <span style={{ background: BRAND_RED }} className="text-white text-[10px] font-bold w-[18px] h-[18px] rounded-full flex items-center justify-center">{basketCount}</span>
+              </button>
+            </nav>
+          </div>
+          <div className="max-w-[1400px] mx-auto px-8 pb-3 flex items-center gap-8 text-[12px] font-bold tracking-[0.14em] uppercase">
+            <button onClick={() => go("new")} className="flex items-center gap-1.5 hover:opacity-60"><Icon name="menu" size={14} /> All Categories</button>
+            <button onClick={() => go("new")} className="hover:opacity-60">Shop New</button>
+            <button onClick={() => go("used")} className="hover:opacity-60 flex items-center gap-1.5">Shop Used <span style={{ background: BRAND_RED }} className="text-white text-[9px] px-1.5 py-0.5">SAVE 70%</span></button>
+            <button className="hover:opacity-60">Bundles</button>
+            <button className="hover:opacity-60">Office Planning</button>
+            <button className="hover:opacity-60">Trade Account</button>
+            <button className="ml-auto hover:opacity-60">Help & FAQ</button>
+          </div>
+        </div>
+
+        {/* Mobile search row */}
+        <div className="lg:hidden px-4 pb-3">
+          <div className="bg-stone-100 flex items-center">
+            <Icon name="search" size={16} className="ml-3 text-stone-500" />
+            <input placeholder="Search desks, chairs, storage…" className="flex-1 px-3 py-2.5 bg-transparent outline-none text-[14px]" />
+          </div>
+        </div>
+      </header>
+      <MobileNavDrawer open={navOpen} onClose={() => setNavOpen(false)} go={go} />
+    </>
+  );
+};
+
+// =============================================================================
+// MOBILE BOTTOM NAV (sticky tab bar)
+// =============================================================================
+const MobileTabBar = ({ go, current, basketCount = 3 }) => (
+  <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t" style={{ borderColor: RULE, paddingBottom: "env(safe-area-inset-bottom)" }}>
+    <div className="grid grid-cols-4">
+      {[
+        { id: "home", icon: "home", l: "Home" },
+        { id: "new", icon: "search", l: "Shop" },
+        { id: "basket", icon: "shopping-bag", l: "Basket", badge: basketCount },
+        { id: "account", icon: "user", l: "Account" },
+      ].map(t => (
+        <button key={t.id} onClick={() => t.id !== "account" && go(t.id)}
+          className={`py-2.5 flex flex-col items-center gap-0.5 relative ${current === t.id ? "text-black" : "text-stone-500"}`}>
+          <div className="relative">
+            <Icon name={t.icon} size={20} />
+            {t.badge > 0 && <span style={{ background: BRAND_RED }} className="absolute -top-1 -right-2 text-white text-[9px] font-bold w-[15px] h-[15px] rounded-full flex items-center justify-center">{t.badge}</span>}
+          </div>
+          <span className="text-[10px] font-bold tracking-wider uppercase">{t.l}</span>
+          {current === t.id && <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5" style={{ background: BRAND_RED }} />}
+        </button>
+      ))}
+    </div>
+  </div>
+);
+
+// =============================================================================
+// FOOTER
+// =============================================================================
+const SiteFooter = () => (
+  <footer style={{ background: INK }} className="text-white mt-16 lg:mt-20 pb-20 lg:pb-0">
+    <div className="max-w-[1400px] mx-auto px-5 lg:px-8 py-10 lg:py-16 grid grid-cols-2 lg:grid-cols-12 gap-6 lg:gap-8">
+      <div className="col-span-2 lg:col-span-4">
+        <Logo className="h-9 brightness-0 invert" />
+        <p className="text-stone-400 text-[13px] mt-4 leading-relaxed max-w-sm">Britain's smarter source for new and second-hand office furniture. Price match guarantee, free UK mainland delivery on orders over £500.</p>
+        <div className="flex flex-col lg:flex-row lg:gap-6 gap-2 mt-5 text-[12px] text-stone-300">
+          <span className="flex items-center gap-2"><Icon name="phone" size={13} /> 0744 465 1200</span>
+          <span className="flex items-center gap-2"><Icon name="mail" size={13} /> hello@directdesk.co.uk</span>
+        </div>
+      </div>
+      {[
+        { h: "Shop", l: ["Desks", "Chairs", "Storage", "Meeting", "Bundles"] },
+        { h: "Used", l: ["Refurb Chairs", "Job Lots", "Clearance", "Trade-In"] },
+        { h: "Help", l: ["How to Order", "Delivery", "Returns", "Contact"] },
+        { h: "Company", l: ["About", "Trade Accounts", "Sustainability"] },
+      ].map((c) => (
+        <div key={c.h} className="col-span-1 lg:col-span-2">
+          <div className="text-[11px] tracking-[0.18em] uppercase mb-3 lg:mb-4" style={{ color: BRAND_RED }}>{c.h}</div>
+          <ul className="space-y-2 text-[13px] text-stone-300">
+            {c.l.map((i) => <li key={i} className="hover:text-white cursor-pointer">{i}</li>)}
+          </ul>
+        </div>
+      ))}
+    </div>
+    <div className="border-t border-stone-800">
+      <div className="max-w-[1400px] mx-auto px-5 lg:px-8 py-4 lg:py-5 flex flex-col lg:flex-row gap-2 lg:justify-between text-[10px] lg:text-[11px] text-stone-500 tracking-wider uppercase">
+        <span>© 2026 Direct Desk Solutions Ltd</span>
+        <span>Privacy · Terms · Cookies · Modern Slavery</span>
+      </div>
+    </div>
+  </footer>
+);
+
+const ProductCard = ({ p, go }) => (
+  <button onClick={() => go("product")} className="text-left group">
+    <div className="aspect-square bg-white border relative overflow-hidden" style={{ borderColor: RULE }}>
+      <img src={p.img} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+      <div className="absolute top-2 left-2 lg:top-3 lg:left-3 flex flex-col gap-1">
+        {p.condition === "used" && <Pill tone="red">Pre-Owned</Pill>}
+        {p.was && <Pill tone="ink">Save {Math.round((1 - p.price / p.was) * 100)}%</Pill>}
+      </div>
+      <button className="absolute top-2 right-2 lg:top-3 lg:right-3 w-8 h-8 lg:w-9 lg:h-9 bg-white/90 backdrop-blur flex items-center justify-center hover:bg-white">
+        <Icon name="heart" size={14} />
+      </button>
+    </div>
+    <div className="pt-3 lg:pt-4">
+      <div className="text-[13px] lg:text-[14px] font-semibold leading-snug line-clamp-2">{p.name}</div>
+      <div className="text-[11px] lg:text-[12px] text-stone-500 mt-0.5 line-clamp-1">{p.sub}</div>
+      <div className="flex items-baseline gap-2 mt-1.5 lg:mt-2">
+        <span className="text-[15px] lg:text-[16px] font-bold">{fmt(p.price)}</span>
+        {p.was && <span className="text-[11px] lg:text-[12px] text-stone-400 line-through">{fmt(p.was)}</span>}
+      </div>
+    </div>
+  </button>
+);
+
+// =============================================================================
+// SCREEN: HOMEPAGE
+// =============================================================================
+const HomeScreen = ({ go }) => (
+  <div style={{ background: PAPER }}>
+    <SiteHeader go={go} />
+
+    <section className="max-w-[1400px] mx-auto px-4 lg:px-8 pt-5 lg:pt-10 pb-4 lg:pb-6 grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
+      {/* Hero */}
+      <div className="lg:col-span-7 relative">
+        <div className="bg-white p-6 lg:p-16 h-full flex flex-col justify-between min-h-[340px] lg:min-h-[460px] relative overflow-hidden border" style={{ borderColor: RULE }}>
+          <div>
+            <div className="text-[10px] lg:text-[11px] tracking-[0.22em] uppercase mb-3 lg:mb-6" style={{ color: BRAND_RED }}>★ Trusted by 4,200+ UK businesses</div>
+            <h1 className="font-black leading-[0.92] tracking-tight" style={{ fontSize: "clamp(34px, 8vw, 76px)", fontFamily: "'Archivo Black', system-ui" }}>
+              Office furniture<br />
+              <span className="italic">without the </span>
+              <span style={{ color: BRAND_RED }} className="italic">markup.</span>
+            </h1>
+            <p className="text-stone-600 mt-4 lg:mt-6 max-w-md text-[14px] lg:text-[15px] leading-relaxed">
+              Brand-new pieces at trade prices, plus pre-owned stock from Britain's best brands. Two routes, one promise — quality you can sit on for a decade.
+            </p>
+          </div>
+          <div className="mt-6 lg:mt-10 relative">
+            <div className="bg-stone-50 border border-black flex items-center">
+              <Icon name="search" size={18} className="ml-3 lg:ml-5 text-stone-500 shrink-0" />
+              <input placeholder="Try ‘standing desk’, ‘Aeron’…" className="flex-1 min-w-0 px-3 lg:px-4 py-3.5 lg:py-5 bg-transparent outline-none text-[13px] lg:text-[14px]" />
+              <button style={{ background: INK }} className="text-white px-4 lg:px-7 py-3.5 lg:py-5 text-[11px] lg:text-[12px] font-bold tracking-[0.16em] uppercase shrink-0">Search →</button>
+            </div>
+            <div className="mt-3 lg:mt-4 flex flex-wrap gap-1.5 lg:gap-2 text-[10px] lg:text-[11px]">
+              <span className="text-stone-500 self-center mr-1">Popular:</span>
+              {["Bench desks", "Aeron", "Tambour", "Job lots"].map(t => (
+                <button key={t} className="px-2.5 lg:px-3 py-1 lg:py-1.5 bg-stone-100 hover:bg-black hover:text-white transition-colors">{t}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Two route boxes */}
+      <div className="lg:col-span-5 grid grid-cols-2 lg:grid-cols-1 lg:grid-rows-2 gap-3 lg:gap-6">
+        <button onClick={() => go("new")} className="group relative overflow-hidden text-left bg-white border" style={{ borderColor: RULE }}>
+          <div className="absolute inset-0">
+            <img src="https://images.unsplash.com/photo-1497366216548-37526070297c?w=900&h=600&fit=crop" className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-700" />
+            <div className="absolute inset-0" style={{ background: "linear-gradient(105deg, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.2) 70%)" }} />
+          </div>
+          <div className="relative p-4 lg:p-8 h-full flex flex-col justify-between text-white min-h-[200px] lg:min-h-[218px]">
+            <div>
+              <Pill tone="paper">New In</Pill>
+              <h2 className="font-black mt-2 lg:mt-3 text-[28px] lg:text-[42px] leading-none tracking-tight" style={{ fontFamily: "'Archivo Black', system-ui" }}>Shop New.</h2>
+              <p className="text-white/85 text-[11px] lg:text-[13px] mt-1.5 lg:mt-2 max-w-xs leading-snug">Direct from manufacturer — 5yr warranty, free delivery.</p>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] lg:text-[12px] tracking-widest uppercase opacity-80">372 in stock</span>
+              <span className="w-8 h-8 lg:w-11 lg:h-11 rounded-full bg-white text-black flex items-center justify-center group-hover:translate-x-1 transition-transform">
+                <Icon name="arrow-right" size={15} />
+              </span>
+            </div>
+          </div>
+        </button>
+
+        <button onClick={() => go("used")} className="group relative overflow-hidden text-left border" style={{ borderColor: RULE, background: BRAND_RED }}>
+          <div className="absolute inset-0 opacity-30">
+            <img src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=900&h=600&fit=crop" className="w-full h-full object-cover mix-blend-multiply group-hover:scale-105 transition-transform duration-700" />
+          </div>
+          <div className="relative p-4 lg:p-8 h-full flex flex-col justify-between text-white min-h-[200px] lg:min-h-[218px]">
+            <div>
+              <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-bold tracking-[0.12em] uppercase bg-black text-white">70% off</span>
+              <h2 className="font-black mt-2 lg:mt-3 text-[28px] lg:text-[42px] leading-none tracking-tight italic" style={{ fontFamily: "'Archivo Black', system-ui" }}>Shop Used.</h2>
+              <p className="text-white/95 text-[11px] lg:text-[13px] mt-1.5 lg:mt-2 max-w-xs leading-snug">Refurbished, inspected, guaranteed.</p>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] lg:text-[12px] tracking-widest uppercase opacity-90">190 items</span>
+              <span className="w-8 h-8 lg:w-11 lg:h-11 rounded-full bg-white text-black flex items-center justify-center group-hover:translate-x-1 transition-transform">
+                <Icon name="arrow-right" size={15} />
+              </span>
+            </div>
+          </div>
+        </button>
+      </div>
+    </section>
+
+    {/* Trust strip — horizontal scroll on mobile */}
+    <section className="max-w-[1400px] mx-auto px-4 lg:px-8 mt-2 lg:mt-0">
+      <div className="flex lg:grid lg:grid-cols-4 overflow-x-auto lg:overflow-visible hide-scrollbar gap-3 lg:gap-0 lg:bg-white lg:border" style={{ borderColor: RULE }}>
+        {[
+          { i: "truck", h: "Free UK Delivery", s: "Orders over £500" },
+          { i: "shield", h: "5-Year Warranty", s: "On all new" },
+          { i: "check", h: "Price Match", s: "Beat any quote" },
+          { i: "sparkles", h: "Refurb Promise", s: "Inspected first" },
+        ].map((x, i) => (
+          <div key={i} className="shrink-0 w-[200px] lg:w-auto p-4 lg:p-6 flex items-center gap-3 lg:gap-4 bg-white border lg:border-0 lg:border-r" style={{ borderColor: RULE }}>
+            <div className="w-9 h-9 lg:w-11 lg:h-11 rounded-full flex items-center justify-center shrink-0" style={{ background: BRAND_RED }}>
+              <Icon name={x.i} size={16} className="text-white" />
+            </div>
+            <div>
+              <div className="text-[12px] lg:text-[13px] font-bold leading-tight">{x.h}</div>
+              <div className="text-[11px] lg:text-[12px] text-stone-500">{x.s}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    {/* Categories */}
+    <section className="max-w-[1400px] mx-auto px-4 lg:px-8 mt-12 lg:mt-20">
+      <div className="flex items-end justify-between mb-5 lg:mb-8">
+        <div>
+          <div className="text-[10px] lg:text-[11px] tracking-[0.22em] uppercase" style={{ color: BRAND_RED }}>01 — Browse</div>
+          <h2 className="text-2xl lg:text-4xl font-black tracking-tight mt-1 lg:mt-2" style={{ fontFamily: "'Archivo Black', system-ui" }}>Shop by category</h2>
+        </div>
+        <button className="text-[11px] lg:text-[12px] font-bold tracking-[0.16em] uppercase border-b-2 border-black pb-1">View all →</button>
+      </div>
+      <div className="grid grid-cols-3 lg:grid-cols-6 gap-2 lg:gap-3">
+        {[
+          { n: "Desks", c: 142, img: "https://images.unsplash.com/photo-1518455027359-f3f8164ba6bd?w=300&h=300&fit=crop" },
+          { n: "Chairs", c: 152, img: "https://images.unsplash.com/photo-1592078615290-033ee584e267?w=300&h=300&fit=crop" },
+          { n: "Storage", c: 95, img: "https://images.unsplash.com/photo-1631679706909-1844bbd07221?w=300&h=300&fit=crop" },
+          { n: "Meeting", c: 46, img: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=300&h=300&fit=crop" },
+          { n: "Reception", c: 22, img: "https://images.unsplash.com/photo-1604328698692-f76ea9498e76?w=300&h=300&fit=crop" },
+          { n: "Acoustic", c: 18, img: "https://images.unsplash.com/photo-1604328698692-f76ea9498e76?w=300&h=300&fit=crop" },
+        ].map((c) => (
+          <button key={c.n} className="group bg-white border text-left" style={{ borderColor: RULE }}>
+            <div className="aspect-square overflow-hidden">
+              <img src={c.img} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+            </div>
+            <div className="p-2 lg:p-3 flex justify-between items-center">
+              <span className="text-[12px] lg:text-[13px] font-bold">{c.n}</span>
+              <span className="text-[10px] lg:text-[11px] text-stone-500">{c.c}</span>
+            </div>
+          </button>
+        ))}
+      </div>
+    </section>
+
+    {/* Featured products */}
+    <section className="max-w-[1400px] mx-auto px-4 lg:px-8 mt-12 lg:mt-20">
+      <div className="flex items-end justify-between mb-5 lg:mb-8">
+        <div>
+          <div className="text-[10px] lg:text-[11px] tracking-[0.22em] uppercase" style={{ color: BRAND_RED }}>02 — In stock</div>
+          <h2 className="text-2xl lg:text-4xl font-black tracking-tight mt-1 lg:mt-2" style={{ fontFamily: "'Archivo Black', system-ui" }}>Best of the warehouse</h2>
+        </div>
+        <div className="hidden lg:flex gap-2">
+          <button className="px-4 py-2 bg-black text-white text-[11px] font-bold tracking-[0.14em] uppercase">All</button>
+          <button className="px-4 py-2 border border-stone-300 text-[11px] font-bold tracking-[0.14em] uppercase">New</button>
+          <button className="px-4 py-2 border border-stone-300 text-[11px] font-bold tracking-[0.14em] uppercase">Used</button>
+        </div>
+      </div>
+      {/* Mobile filter pills */}
+      <div className="flex lg:hidden gap-2 mb-4 -mx-4 px-4 overflow-x-auto hide-scrollbar">
+        <button className="shrink-0 px-3 py-1.5 bg-black text-white text-[11px] font-bold tracking-wider uppercase">All</button>
+        <button className="shrink-0 px-3 py-1.5 border text-[11px] font-bold tracking-wider uppercase" style={{ borderColor: RULE }}>New</button>
+        <button className="shrink-0 px-3 py-1.5 border text-[11px] font-bold tracking-wider uppercase" style={{ borderColor: RULE }}>Used</button>
+        <button className="shrink-0 px-3 py-1.5 border text-[11px] font-bold tracking-wider uppercase" style={{ borderColor: RULE }}>Under £500</button>
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
+        {PRODUCTS.slice(0, 8).map((p) => <ProductCard key={p.id} p={p} go={go} />)}
+      </div>
+    </section>
+
+    {/* Used programme */}
+    <section className="max-w-[1400px] mx-auto px-4 lg:px-8 mt-14 lg:mt-24">
+      <div className="bg-black text-white p-6 lg:p-20 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 relative overflow-hidden">
+        <div className="absolute top-0 right-0 text-[140px] lg:text-[280px] font-black opacity-5 leading-none -mt-4 lg:-mt-10" style={{ fontFamily: "'Archivo Black', system-ui" }}>70%</div>
+        <div className="lg:col-span-6 relative">
+          <div className="text-[10px] lg:text-[11px] tracking-[0.22em] uppercase mb-3 lg:mb-6" style={{ color: BRAND_RED }}>The Used Programme</div>
+          <h2 className="text-3xl lg:text-6xl font-black leading-[0.95] tracking-tight" style={{ fontFamily: "'Archivo Black', system-ui" }}>
+            Premium brands.<br /><span className="italic" style={{ color: BRAND_RED }}>Half the carbon.</span><br />A fraction of the price.
+          </h2>
+        </div>
+        <div className="lg:col-span-6 relative space-y-4 lg:space-y-6">
+          {[
+            { n: "01", h: "Sourced from real offices", s: "Corporate clear-outs, lease end. Real provenance." },
+            { n: "02", h: "Inspected & graded", s: "Every item rated A/B/C. Photographed honestly." },
+            { n: "03", h: "Refurbished where it counts", s: "Deep clean, fixings replaced. 12-month guarantee." },
+          ].map((x) => (
+            <div key={x.n} className="flex gap-4 lg:gap-5 pb-4 lg:pb-5 border-b border-stone-800">
+              <div className="text-[22px] lg:text-[28px] font-black opacity-40" style={{ fontFamily: "'Archivo Black', system-ui" }}>{x.n}</div>
+              <div>
+                <div className="text-[14px] lg:text-[15px] font-bold">{x.h}</div>
+                <div className="text-[12px] lg:text-[13px] text-stone-400 mt-1">{x.s}</div>
+              </div>
+            </div>
+          ))}
+          <button onClick={() => go("used")} className="inline-flex items-center gap-2 mt-2 px-5 lg:px-6 py-3 text-[11px] lg:text-[12px] font-bold tracking-[0.16em] uppercase" style={{ background: BRAND_RED }}>
+            Browse Used Stock <Icon name="arrow-right" size={13} />
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <SiteFooter />
+    <MobileTabBar go={go} current="home" />
+  </div>
+);
+
+// =============================================================================
+// FILTER DRAWER (mobile)
+// =============================================================================
+const FilterDrawer = ({ open, onClose, isUsed }) => {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[100] lg:hidden fade-in">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="absolute inset-x-0 bottom-0 bg-white max-h-[85vh] flex flex-col slide-up rounded-t-2xl">
+        <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: RULE }}>
+          <div>
+            <h3 className="text-lg font-black" style={{ fontFamily: "'Archivo Black', system-ui" }}>Filter</h3>
+            <button className="text-[11px] underline">Clear all</button>
+          </div>
+          <button onClick={onClose} className="w-9 h-9 flex items-center justify-center"><Icon name="x" size={20} /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-5 space-y-6">
+          <div>
+            <div className="text-[12px] font-bold uppercase tracking-wider mb-3">Category</div>
+            <div className="flex flex-wrap gap-2">
+              {(isUsed ? USED_CATEGORIES : NEW_CATEGORIES).map((c, i) => (
+                <button key={c.name} className={`px-3 py-2 text-[12px] border-2 ${i === 0 ? "border-black bg-black text-white" : "border-stone-200"}`}>
+                  {c.name} <span className="opacity-60 ml-1">{c.count}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t pt-5" style={{ borderColor: RULE }}>
+            <div className="text-[12px] font-bold uppercase tracking-wider mb-3">Price range</div>
+            <div className="flex gap-3">
+              <input className="border w-full px-3 py-2.5 text-[13px]" placeholder="£0" style={{ borderColor: RULE }} />
+              <input className="border w-full px-3 py-2.5 text-[13px]" placeholder="£5000+" style={{ borderColor: RULE }} />
+            </div>
+          </div>
+
+          {isUsed && (
+            <div className="border-t pt-5" style={{ borderColor: RULE }}>
+              <div className="text-[12px] font-bold uppercase tracking-wider mb-3">Condition Grade</div>
+              {[
+                { g: "A", d: "As new — minor signs of use" },
+                { g: "B", d: "Light wear, fully functional" },
+                { g: "C", d: "Honest wear, priced down" },
+              ].map(x => (
+                <label key={x.g} className="flex items-start gap-3 mb-3 text-[13px] cursor-pointer">
+                  <input type="checkbox" defaultChecked className="mt-1 w-5 h-5" />
+                  <div><span className="font-bold">Grade {x.g}</span><div className="text-stone-500 text-[12px] mt-0.5">{x.d}</div></div>
+                </label>
+              ))}
+            </div>
+          )}
+
+          <div className="border-t pt-5" style={{ borderColor: RULE }}>
+            <div className="text-[12px] font-bold uppercase tracking-wider mb-3">Brand</div>
+            {["Impulse", "Herman Miller", "Steelcase", "Orangebox", "Vitra"].map(b => (
+              <label key={b} className="flex items-center gap-3 mb-2.5 text-[13px] cursor-pointer">
+                <input type="checkbox" className="w-5 h-5" /> {b}
+              </label>
+            ))}
+          </div>
+
+          <div className="border-t pt-5" style={{ borderColor: RULE }}>
+            <div className="text-[12px] font-bold uppercase tracking-wider mb-3">Colour / Finish</div>
+            <div className="flex flex-wrap gap-3">
+              {["#000", "#fff", "#A47148", "#4A4A4A", "#D9D2C5", "#1F2937"].map(c => (
+                <button key={c} style={{ background: c }} className="w-12 h-12 border" />
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="p-4 border-t bg-white" style={{ borderColor: RULE }}>
+          <button onClick={onClose} className="w-full py-4 bg-black text-white text-[13px] font-bold tracking-[0.16em] uppercase">
+            Show {isUsed ? "190" : "372"} results
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// =============================================================================
+// SCREEN: CATEGORY
+// =============================================================================
+const CategoryScreen = ({ go, mode = "new" }) => {
+  const isUsed = mode === "used";
+  const items = isUsed ? PRODUCTS.filter(p => p.condition === "used") : PRODUCTS.filter(p => p.condition === "new");
+  const display = [...items, ...PRODUCTS, ...PRODUCTS].slice(0, 12);
+  const [filterOpen, setFilterOpen] = useState(false);
+
+  return (
+    <div style={{ background: PAPER }}>
+      <SiteHeader go={go} />
+
+      <section className="text-white" style={{ background: isUsed ? BRAND_RED : INK }}>
+        <div className="max-w-[1400px] mx-auto px-4 lg:px-8 py-8 lg:py-14">
+          <div className="text-[10px] lg:text-[11px] tracking-[0.22em] uppercase opacity-70">
+            <button onClick={() => go("home")}>Home</button> / Shop {isUsed ? "Used" : "New"}
+          </div>
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between mt-2 lg:mt-3 gap-2">
+            <h1 className="text-4xl lg:text-7xl font-black tracking-tight leading-none" style={{ fontFamily: "'Archivo Black', system-ui" }}>
+              {isUsed ? <>Pre-Owned <span className="italic">Office.</span></> : <>New <span className="italic">Office.</span></>}
+            </h1>
+            <div className="lg:text-right flex items-baseline gap-3 lg:block">
+              <div className="text-2xl lg:text-4xl font-black" style={{ fontFamily: "'Archivo Black', system-ui" }}>{isUsed ? "190" : "372"}</div>
+              <div className="text-[10px] lg:text-[11px] tracking-[0.18em] uppercase opacity-70">Products</div>
+            </div>
+          </div>
+          <p className="mt-4 lg:mt-6 max-w-2xl text-[13px] lg:text-[14px] opacity-90 leading-relaxed">
+            {isUsed
+              ? "Inspected, refurbished, and graded honestly. Premium brands at trade-clearance prices. 12-month guarantee on every refurb."
+              : "Direct-from-manufacturer pricing on Britain's most-specified office furniture. Free delivery, 5-year warranty as standard."}
+          </p>
+        </div>
+      </section>
+
+      {/* Mobile sort/filter bar (sticky) */}
+      <div className="lg:hidden sticky top-[111px] z-30 bg-white border-b" style={{ borderColor: RULE }}>
+        <div className="flex divide-x" style={{ divideColor: RULE }}>
+          <button onClick={() => setFilterOpen(true)} className="flex-1 py-3 flex items-center justify-center gap-2 text-[12px] font-bold tracking-wider uppercase">
+            <Icon name="sliders-horizontal" size={14} /> Filter <span style={{ background: BRAND_RED }} className="text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold">3</span>
+          </button>
+          <button className="flex-1 py-3 flex items-center justify-center gap-2 text-[12px] font-bold tracking-wider uppercase border-l" style={{ borderColor: RULE }}>
+            <Icon name="arrow-down-up" size={14} /> Popular
+          </button>
+        </div>
+      </div>
+
+      <div className="max-w-[1400px] mx-auto px-4 lg:px-8 py-5 lg:py-10 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+        {/* Desktop sidebar */}
+        <aside className="hidden lg:block lg:col-span-3">
+          <div className="bg-white border p-6 sticky top-4" style={{ borderColor: RULE }}>
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-[14px] font-bold tracking-wider uppercase">Filter</h3>
+              <button className="text-[11px] underline">Clear all</button>
+            </div>
+            <div className="space-y-6">
+              <div>
+                <div className="text-[12px] font-bold uppercase tracking-wider mb-3">Category</div>
+                <ul className="space-y-2 text-[13px]">
+                  {(isUsed ? USED_CATEGORIES : NEW_CATEGORIES).map((c, i) => (
+                    <li key={c.name} className="flex justify-between items-center hover:underline cursor-pointer">
+                      <span className="flex items-center gap-2">
+                        {i === 0 && <span style={{ background: BRAND_RED }} className="w-1 h-4" />}
+                        {c.name}
+                      </span>
+                      <span className="text-stone-400 text-[11px]">{c.count}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="border-t pt-5" style={{ borderColor: RULE }}>
+                <div className="text-[12px] font-bold uppercase tracking-wider mb-3">Price</div>
+                <div className="flex gap-2">
+                  <input className="border w-full px-2 py-1.5 text-[12px]" placeholder="£0" style={{ borderColor: RULE }} />
+                  <input className="border w-full px-2 py-1.5 text-[12px]" placeholder="£5000+" style={{ borderColor: RULE }} />
+                </div>
+              </div>
+              {isUsed && (
+                <div className="border-t pt-5" style={{ borderColor: RULE }}>
+                  <div className="text-[12px] font-bold uppercase tracking-wider mb-3">Condition Grade</div>
+                  {[{ g: "A", d: "As new" }, { g: "B", d: "Light wear" }, { g: "C", d: "Honest wear" }].map(x => (
+                    <label key={x.g} className="flex items-start gap-2 mb-2 text-[12px] cursor-pointer">
+                      <input type="checkbox" defaultChecked className="mt-1" />
+                      <div><span className="font-bold">Grade {x.g}</span><div className="text-stone-500 text-[11px]">{x.d}</div></div>
+                    </label>
+                  ))}
+                </div>
+              )}
+              <div className="border-t pt-5" style={{ borderColor: RULE }}>
+                <div className="text-[12px] font-bold uppercase tracking-wider mb-3">Brand</div>
+                {["Impulse", "Herman Miller", "Steelcase", "Orangebox", "Vitra"].map(b => (
+                  <label key={b} className="flex items-center gap-2 mb-1.5 text-[12px] cursor-pointer">
+                    <input type="checkbox" /> {b}
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <main className="lg:col-span-9">
+          {/* Desktop toolbar */}
+          <div className="hidden lg:flex justify-between items-center mb-5 bg-white border p-4" style={{ borderColor: RULE }}>
+            <div className="text-[13px]">Showing <strong>1–12</strong> of <strong>{isUsed ? 190 : 372}</strong></div>
+            <div className="flex items-center gap-3">
+              <span className="text-[12px] text-stone-500">Sort:</span>
+              <select className="border-0 text-[13px] font-bold bg-transparent">
+                <option>Most Popular</option><option>Price: Low to High</option><option>Price: High to Low</option><option>Newest</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-5">
+            {display.map((p, i) => <ProductCard key={i} p={p} go={go} />)}
+          </div>
+
+          <div className="flex justify-center gap-1 mt-8 lg:mt-12">
+            {[1, 2, 3, "...", 8].map((n, i) => (
+              <button key={i} className={`w-9 h-9 lg:w-10 lg:h-10 text-[12px] lg:text-[13px] font-bold ${n === 1 ? "bg-black text-white" : "border"}`} style={{ borderColor: RULE }}>{n}</button>
+            ))}
+            <button className="w-9 h-9 lg:w-10 lg:h-10 text-[13px] font-bold border flex items-center justify-center" style={{ borderColor: RULE }}><Icon name="chevron-right" size={14} /></button>
+          </div>
+        </main>
+      </div>
+
+      <SiteFooter />
+      <MobileTabBar go={go} current="new" />
+      <FilterDrawer open={filterOpen} onClose={() => setFilterOpen(false)} isUsed={isUsed} />
+    </div>
+  );
+};
+
+// =============================================================================
+// SCREEN: PRODUCT
+// =============================================================================
+const ProductScreen = ({ go }) => {
+  const [imgIdx, setImgIdx] = useState(0);
+  const [qty, setQty] = useState(1);
+  const imgs = [
+    "https://images.unsplash.com/photo-1580480055273-228ff5388ef8?w=900&h=900&fit=crop",
+    "https://images.unsplash.com/photo-1592078615290-033ee584e267?w=900&h=900&fit=crop",
+    "https://images.unsplash.com/photo-1518455027359-f3f8164ba6bd?w=900&h=900&fit=crop",
+    "https://images.unsplash.com/photo-1631679706909-1844bbd07221?w=900&h=900&fit=crop",
+  ];
+
+  return (
+    <div style={{ background: PAPER }} className="pb-24 lg:pb-0">
+      <SiteHeader go={go} />
+
+      <div className="max-w-[1400px] mx-auto px-4 lg:px-8 pt-3 lg:pt-6 text-[10px] lg:text-[12px] text-stone-500 tracking-wider">
+        <button onClick={() => go("home")}>HOME</button> / <button onClick={() => go("used")}>USED</button> / <button onClick={() => go("used")}>CHAIRS</button> / <span className="text-black">AERON</span>
+      </div>
+
+      <div className="max-w-[1400px] mx-auto lg:px-8 py-4 lg:py-8 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10">
+        {/* Mobile: swipeable carousel | Desktop: thumb + main */}
+        <div className="lg:col-span-7">
+          {/* Mobile gallery */}
+          <div className="lg:hidden">
+            <div className="relative">
+              <div className="flex overflow-x-auto snap-x-mandatory hide-scrollbar">
+                {imgs.map((img, i) => (
+                  <div key={i} className="snap-start shrink-0 w-full bg-white relative">
+                    <img src={img} className="w-full aspect-square object-cover" />
+                  </div>
+                ))}
+              </div>
+              <div className="absolute top-3 left-4 flex flex-col gap-1.5">
+                <Pill tone="red">Pre-Owned · Grade A</Pill>
+                <Pill tone="ink">Save 63%</Pill>
+              </div>
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                {imgs.map((_, i) => (
+                  <div key={i} className={`h-1.5 rounded-full transition-all ${i === 0 ? "w-6 bg-black" : "w-1.5 bg-black/40"}`} />
+                ))}
+              </div>
+              <button className="absolute top-3 right-4 w-10 h-10 bg-white/90 backdrop-blur rounded-full flex items-center justify-center"><Icon name="heart" size={18} /></button>
+            </div>
+          </div>
+          {/* Desktop gallery */}
+          <div className="hidden lg:flex gap-4">
+            <div className="flex flex-col gap-3 w-20 shrink-0">
+              {imgs.map((img, i) => (
+                <button key={i} onClick={() => setImgIdx(i)} className={`aspect-square border-2 ${imgIdx === i ? "border-black" : "border-transparent"}`}>
+                  <img src={img} className="w-full h-full object-cover" />
+                </button>
+              ))}
+              <button className="aspect-square border flex flex-col items-center justify-center text-[10px] text-stone-500" style={{ borderColor: RULE }}>+8<br />more</button>
+            </div>
+            <div className="flex-1 bg-white border relative" style={{ borderColor: RULE }}>
+              <img src={imgs[imgIdx]} className="w-full aspect-square object-cover" />
+              <div className="absolute top-4 left-4 flex flex-col gap-2">
+                <Pill tone="red">Pre-Owned · Grade A</Pill>
+                <Pill tone="ink">Save 63%</Pill>
+              </div>
+              <button className="absolute bottom-4 right-4 px-4 py-2 bg-white border border-black text-[11px] font-bold tracking-wider uppercase">⤢ View 360°</button>
+            </div>
+          </div>
+        </div>
+
+        {/* Details */}
+        <div className="lg:col-span-5 px-4 lg:px-0">
+          <div className="text-[10px] lg:text-[11px] tracking-[0.18em] uppercase text-stone-500 mt-3 lg:mt-0">Herman Miller</div>
+          <h1 className="text-2xl lg:text-4xl font-black mt-1 lg:mt-2 leading-tight tracking-tight" style={{ fontFamily: "'Archivo Black', system-ui" }}>
+            Aeron Chair — Size B Graphite
+          </h1>
+          <div className="flex items-center gap-2 lg:gap-3 mt-2 lg:mt-3 text-[11px] lg:text-[12px] flex-wrap">
+            <div className="flex">{[1, 2, 3, 4, 5].map(i => <Icon key={i} name="star" size={12} fill="black" stroke="none" />)}</div>
+            <span>4.9 · 247 reviews</span>
+            <span className="text-stone-400">·</span>
+            <span className="text-stone-500">SKU: DDS-USED-AER-014</span>
+          </div>
+
+          <div className="mt-4 lg:mt-6 pb-5 lg:pb-6 border-b" style={{ borderColor: RULE }}>
+            <div className="flex items-baseline gap-2 lg:gap-3 flex-wrap">
+              <span className="text-3xl lg:text-4xl font-black" style={{ fontFamily: "'Archivo Black', system-ui" }}>£485.00</span>
+              <span className="text-[14px] lg:text-[16px] text-stone-400 line-through">£1,295.00</span>
+              <span className="text-white px-2 py-0.5 text-[11px] font-bold" style={{ background: BRAND_RED }}>SAVE £810</span>
+            </div>
+            <div className="text-[11px] lg:text-[12px] text-stone-500 mt-1">Inc. VAT · Free UK mainland delivery</div>
+          </div>
+
+          <div className="mt-5 lg:mt-6 p-4 border-l-4" style={{ borderColor: BRAND_RED, background: "#fff" }}>
+            <div className="text-[11px] font-bold tracking-[0.16em] uppercase" style={{ color: BRAND_RED }}>Condition Report</div>
+            <div className="mt-2 text-[12px] lg:text-[13px] leading-relaxed">
+              <strong>Grade A</strong> — minor signs of office use on armrest tops. Mesh inspected and cleaned. Gas lift, tilt mechanism, casters all replaced. <strong>12-month guarantee.</strong>
+            </div>
+            <button className="mt-2 text-[12px] underline">View 8 condition photos →</button>
+          </div>
+
+          <div className="mt-5 lg:mt-7">
+            <div className="text-[11px] lg:text-[12px] font-bold tracking-wider uppercase mb-2">Size</div>
+            <div className="flex gap-2">
+              {[{ s: "A", d: "Small", a: false }, { s: "B", d: "Medium", a: true }, { s: "C", d: "Large", a: false }].map(o => (
+                <button key={o.s} disabled={!o.a} className={`flex-1 p-2.5 lg:p-3 border-2 text-left ${o.s === "B" ? "border-black bg-black text-white" : "border-stone-300 disabled:opacity-40"}`}>
+                  <div className="text-[10px] lg:text-[11px] uppercase tracking-wider">Size {o.s}</div>
+                  <div className="text-[10px] opacity-70">{o.d}{!o.a && " · Sold out"}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-4 lg:mt-5 hidden lg:block">
+            <div className="text-[12px] font-bold tracking-wider uppercase mb-2">Quantity · 3 in stock</div>
+            <div className="flex items-stretch gap-3">
+              <div className="flex border" style={{ borderColor: INK }}>
+                <button onClick={() => setQty(Math.max(1, qty - 1))} className="w-12 hover:bg-black hover:text-white"><Icon name="minus" size={14} className="mx-auto" /></button>
+                <div className="w-14 text-center self-center font-bold">{qty}</div>
+                <button onClick={() => setQty(qty + 1)} className="w-12 hover:bg-black hover:text-white"><Icon name="plus" size={14} className="mx-auto" /></button>
+              </div>
+              <button onClick={() => go("basket")} className="flex-1 text-white font-bold tracking-[0.14em] uppercase text-[13px] flex items-center justify-center gap-2 hover:opacity-90" style={{ background: INK }}>
+                <Icon name="shopping-bag" size={15} /> Add to Basket — {fmt(485 * qty)}
+              </button>
+            </div>
+            <button className="w-full mt-2 py-3 border border-black text-[12px] font-bold tracking-[0.14em] uppercase hover:bg-black hover:text-white">
+              Buy Now — Same Day Despatch
+            </button>
+          </div>
+
+          <div className="mt-5 lg:mt-7 grid grid-cols-3 gap-2 lg:gap-3 text-center">
+            {[
+              { i: "truck", h: "Free delivery", s: "3–5 days" },
+              { i: "shield", h: "12-mo warranty", s: "On refurbs" },
+              { i: "check", h: "30-day returns", s: "No quibble" },
+            ].map((x, i) => (
+              <div key={i} className="border p-2.5 lg:p-3" style={{ borderColor: RULE }}>
+                <Icon name={x.i} size={16} className="mx-auto" />
+                <div className="text-[10px] lg:text-[11px] font-bold mt-1.5 leading-tight">{x.h}</div>
+                <div className="text-[9px] lg:text-[10px] text-stone-500">{x.s}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Specs accordion-style on mobile */}
+          <details className="lg:hidden mt-6 border-t border-b py-4" style={{ borderColor: RULE }}>
+            <summary className="flex justify-between items-center font-bold text-[14px] cursor-pointer">
+              Specifications <Icon name="chevron-down" size={16} />
+            </summary>
+            <div className="mt-4 space-y-2.5 text-[12px]">
+              {[
+                ["Dimensions", "W: 686mm × D: 686mm × H: 990–1054mm"],
+                ["Seat height", "419–533mm adjustable"],
+                ["Material", "Pellicle suspension mesh, aluminium"],
+                ["Weight rating", "159 kg"],
+                ["Warranty", "12 months (refurb)"],
+              ].map(([k, v]) => (
+                <div key={k} className="flex justify-between gap-3">
+                  <span className="text-stone-500">{k}</span>
+                  <span className="font-bold text-right">{v}</span>
+                </div>
+              ))}
+            </div>
+          </details>
+          <details className="lg:hidden border-b py-4" style={{ borderColor: RULE }}>
+            <summary className="flex justify-between items-center font-bold text-[14px] cursor-pointer">
+              Delivery & Returns <Icon name="chevron-down" size={16} />
+            </summary>
+            <div className="mt-3 text-[12px] text-stone-600 leading-relaxed">
+              Free standard delivery (3–5 days) on orders over £500. Premium with assembly available at £89. 30-day no-quibble returns.
+            </div>
+          </details>
+        </div>
+      </div>
+
+      {/* Desktop spec table */}
+      <div className="hidden lg:grid max-w-[1400px] mx-auto px-8 mt-16 grid-cols-12 gap-10">
+        <div className="col-span-3">
+          <div className="text-[11px] tracking-[0.22em] uppercase" style={{ color: BRAND_RED }}>03 — Specs</div>
+          <h2 className="text-3xl font-black mt-2 leading-none" style={{ fontFamily: "'Archivo Black', system-ui" }}>The numbers.</h2>
+        </div>
+        <div className="col-span-9 grid grid-cols-2 gap-x-10 gap-y-3 text-[13px]">
+          {[
+            ["Dimensions", "W: 686mm × D: 686mm × H: 990–1054mm"],
+            ["Seat height", "419–533mm adjustable"],
+            ["Material", "Pellicle suspension mesh, aluminium"],
+            ["Weight rating", "159 kg"],
+            ["Warranty", "12 months (refurb)"],
+            ["Origin", "Designed by Chadwick & Stumpf, 1994"],
+          ].map(([k, v]) => (
+            <div key={k} className="flex justify-between border-b py-3" style={{ borderColor: RULE }}>
+              <span className="text-stone-500">{k}</span>
+              <span className="font-bold text-right">{v}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <SiteFooter />
+
+      {/* MOBILE STICKY ADD-TO-BASKET BAR */}
+      <div className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t p-3 flex items-center gap-2" style={{ borderColor: RULE, paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)" }}>
+        <div className="flex border shrink-0" style={{ borderColor: INK }}>
+          <button onClick={() => setQty(Math.max(1, qty - 1))} className="w-9 h-11"><Icon name="minus" size={14} className="mx-auto" /></button>
+          <div className="w-9 text-center self-center font-bold text-[14px]">{qty}</div>
+          <button onClick={() => setQty(qty + 1)} className="w-9 h-11"><Icon name="plus" size={14} className="mx-auto" /></button>
+        </div>
+        <button onClick={() => go("basket")} className="flex-1 h-11 text-white font-bold tracking-[0.12em] uppercase text-[12px] flex items-center justify-center gap-2" style={{ background: INK }}>
+          Add — {fmt(485 * qty)}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// =============================================================================
+// SCREEN: BASKET
+// =============================================================================
+const BasketScreen = ({ go }) => {
+  const items = [
+    { ...PRODUCTS[1], qty: 2 },
+    { ...PRODUCTS[0], qty: 1 },
+    { ...PRODUCTS[5], qty: 4 },
+  ];
+  const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0);
+  const delivery = subtotal > 500 ? 0 : 49;
+  const vat = subtotal * 0.2;
+  const total = subtotal + delivery + vat;
+
+  return (
+    <div style={{ background: PAPER }} className="pb-24 lg:pb-0">
+      <SiteHeader go={go} basketCount={items.length} />
+
+      <div className="max-w-[1400px] mx-auto px-4 lg:px-8 py-6 lg:py-12">
+        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between mb-6 lg:mb-10 gap-3">
+          <div>
+            <div className="text-[10px] lg:text-[11px] tracking-[0.22em] uppercase" style={{ color: BRAND_RED }}>Your Basket</div>
+            <h1 className="text-3xl lg:text-5xl font-black mt-1 lg:mt-2 tracking-tight leading-tight" style={{ fontFamily: "'Archivo Black', system-ui" }}>
+              {items.length} items, ready to ship.
+            </h1>
+          </div>
+          <div className="hidden lg:block text-[12px] tracking-wider uppercase">
+            <span className="text-black font-bold">Basket</span> →
+            <span className="text-stone-400 ml-2">Delivery</span> →
+            <span className="text-stone-400 ml-2">Payment</span>
+          </div>
+          {/* Mobile progress */}
+          <div className="lg:hidden flex items-center gap-2 text-[10px] tracking-wider uppercase">
+            <span className="font-bold flex items-center gap-1.5"><span className="w-5 h-5 rounded-full bg-black text-white flex items-center justify-center text-[10px]">1</span> Basket</span>
+            <span className="text-stone-300 flex-1 h-px bg-stone-300" />
+            <span className="text-stone-400 flex items-center gap-1.5"><span className="w-5 h-5 rounded-full border border-stone-300 flex items-center justify-center text-[10px]">2</span> Pay</span>
+            <span className="text-stone-300 flex-1 h-px bg-stone-300" />
+            <span className="text-stone-400 flex items-center gap-1.5"><span className="w-5 h-5 rounded-full border border-stone-300 flex items-center justify-center text-[10px]">3</span> Done</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10">
+          <div className="lg:col-span-8">
+            {/* Mobile: card list */}
+            <div className="lg:hidden space-y-3">
+              {items.map((it, idx) => (
+                <div key={idx} className="bg-white border p-3 flex gap-3" style={{ borderColor: RULE }}>
+                  <img src={it.img} className="w-24 h-24 object-cover shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-bold leading-tight line-clamp-2">{it.name}</div>
+                    <div className="text-[11px] text-stone-500 mt-0.5 line-clamp-1">{it.sub}</div>
+                    {it.condition === "used" && <div className="mt-1.5"><Pill tone="red">Pre-Owned</Pill></div>}
+                    <div className="flex items-center justify-between mt-2.5">
+                      <div className="flex border" style={{ borderColor: INK }}>
+                        <button className="w-8 h-8"><Icon name="minus" size={12} className="mx-auto" /></button>
+                        <div className="w-8 text-center self-center font-bold text-[12px]">{it.qty}</div>
+                        <button className="w-8 h-8"><Icon name="plus" size={12} className="mx-auto" /></button>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-[14px]">{fmt(it.price * it.qty)}</div>
+                        <button className="text-[10px] text-stone-500 underline mt-0.5">Remove</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <button onClick={() => go("home")} className="w-full py-3 border text-[12px] font-bold tracking-wider uppercase" style={{ borderColor: RULE }}>
+                ← Continue Shopping
+              </button>
+            </div>
+
+            {/* Desktop: table */}
+            <div className="hidden lg:block bg-white border" style={{ borderColor: RULE }}>
+              <div className="grid grid-cols-12 gap-4 px-6 py-3 text-[11px] tracking-[0.16em] uppercase border-b text-stone-500" style={{ borderColor: RULE }}>
+                <div className="col-span-6">Product</div>
+                <div className="col-span-2 text-center">Qty</div>
+                <div className="col-span-2 text-right">Unit</div>
+                <div className="col-span-2 text-right">Total</div>
+              </div>
+              {items.map((it, idx) => (
+                <div key={idx} className="grid grid-cols-12 gap-4 px-6 py-5 border-b items-center" style={{ borderColor: RULE }}>
+                  <div className="col-span-6 flex gap-4 items-center">
+                    <img src={it.img} className="w-20 h-20 object-cover border" style={{ borderColor: RULE }} />
+                    <div>
+                      <div className="text-[14px] font-bold leading-tight">{it.name}</div>
+                      <div className="text-[12px] text-stone-500 mt-0.5">{it.sub}</div>
+                      <div className="flex gap-3 mt-2 text-[11px]">
+                        {it.condition === "used" && <Pill tone="red">Pre-Owned</Pill>}
+                        <button className="underline">Edit</button>
+                        <button className="underline text-stone-500 flex items-center gap-1"><Icon name="trash-2" size={11} /> Remove</button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col-span-2 flex justify-center">
+                    <div className="flex border" style={{ borderColor: INK }}>
+                      <button className="w-8 h-8"><Icon name="minus" size={12} className="mx-auto" /></button>
+                      <div className="w-10 text-center self-center font-bold text-[13px]">{it.qty}</div>
+                      <button className="w-8 h-8"><Icon name="plus" size={12} className="mx-auto" /></button>
+                    </div>
+                  </div>
+                  <div className="col-span-2 text-right text-[13px]">{fmt(it.price)}</div>
+                  <div className="col-span-2 text-right font-bold">{fmt(it.price * it.qty)}</div>
+                </div>
+              ))}
+              <div className="px-6 py-4 flex justify-between items-center bg-stone-50">
+                <button onClick={() => go("home")} className="text-[12px] font-bold tracking-[0.14em] uppercase">← Continue Shopping</button>
+                <button className="text-[12px] tracking-wider uppercase underline">Save basket</button>
+              </div>
+            </div>
+
+            <div className="mt-8 lg:mt-12">
+              <div className="text-[10px] lg:text-[11px] tracking-[0.22em] uppercase mb-2 lg:mb-3" style={{ color: BRAND_RED }}>You might also need</div>
+              <h3 className="text-xl lg:text-2xl font-black mb-4 lg:mb-5" style={{ fontFamily: "'Archivo Black', system-ui" }}>Frequently bought together</h3>
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
+                {PRODUCTS.slice(2, 5).map(p => <ProductCard key={p.id} p={p} go={go} />)}
+              </div>
+            </div>
+          </div>
+
+          {/* Summary - desktop sidebar / mobile inline at end */}
+          <div className="lg:col-span-4 hidden lg:block">
+            <div className="bg-black text-white p-7 sticky top-4">
+              <h3 className="text-2xl font-black mb-5" style={{ fontFamily: "'Archivo Black', system-ui" }}>Order Summary</h3>
+              <div className="space-y-3 text-[13px] pb-5 border-b border-stone-700">
+                <div className="flex justify-between"><span className="text-stone-400">Subtotal (ex. VAT)</span><span>{fmt(subtotal)}</span></div>
+                <div className="flex justify-between"><span className="text-stone-400">VAT @ 20%</span><span>{fmt(vat)}</span></div>
+                <div className="flex justify-between">
+                  <span className="text-stone-400">Delivery</span>
+                  <span>{delivery === 0 ? <span style={{ color: BRAND_RED }} className="font-bold">FREE</span> : fmt(delivery)}</span>
+                </div>
+              </div>
+              <div className="flex justify-between items-baseline py-5">
+                <span className="text-[13px] tracking-wider uppercase">Total</span>
+                <span className="text-3xl font-black" style={{ fontFamily: "'Archivo Black', system-ui" }}>{fmt(total)}</span>
+              </div>
+              <div className="flex gap-2 mb-4">
+                <input placeholder="Promo code" className="flex-1 bg-stone-900 border border-stone-700 px-3 py-2.5 text-[13px] focus:outline-none focus:border-white" />
+                <button className="px-4 border border-white text-[11px] font-bold tracking-wider uppercase">Apply</button>
+              </div>
+              <button onClick={() => go("checkout")} className="w-full py-4 text-white text-[13px] font-bold tracking-[0.16em] uppercase flex items-center justify-center gap-2" style={{ background: BRAND_RED }}>
+                Checkout Securely <Icon name="arrow-right" size={15} />
+              </button>
+              <div className="mt-5 pt-5 border-t border-stone-700 space-y-2 text-[11px] text-stone-400">
+                <div className="flex items-center gap-2"><Icon name="truck" size={12} /> Free delivery — saved {fmt(49)}</div>
+                <div className="flex items-center gap-2"><Icon name="shield" size={12} /> SSL encrypted checkout</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <SiteFooter />
+
+      {/* MOBILE STICKY CHECKOUT BAR */}
+      <div className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-black text-white border-t" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+        <div className="px-4 py-3 flex items-center gap-3">
+          <div className="flex-1">
+            <div className="text-[10px] tracking-wider uppercase text-stone-400">Total inc. VAT</div>
+            <div className="text-xl font-black leading-none mt-0.5" style={{ fontFamily: "'Archivo Black', system-ui" }}>{fmt(total)}</div>
+            <div className="text-[10px] mt-0.5" style={{ color: BRAND_RED }}>FREE delivery applied</div>
+          </div>
+          <button onClick={() => go("checkout")} className="px-5 h-12 text-white font-bold tracking-[0.12em] uppercase text-[12px] flex items-center gap-1.5" style={{ background: BRAND_RED }}>
+            Checkout <Icon name="arrow-right" size={14} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// =============================================================================
+// SCREEN: CHECKOUT
+// =============================================================================
+const CheckoutScreen = ({ go }) => {
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  return (
+    <div style={{ background: PAPER }} className="min-h-screen pb-20 lg:pb-0">
+      <header className="bg-white border-b" style={{ borderColor: RULE }}>
+        <div className="max-w-[1400px] mx-auto px-4 lg:px-8 py-3 lg:py-5 flex items-center justify-between">
+          <button onClick={() => go("basket")} className="lg:hidden flex items-center gap-1 text-[12px]"><Icon name="chevron-left" size={16} /> Back</button>
+          <button onClick={() => go("home")}><Logo className="h-8 lg:h-9" /></button>
+          <div className="hidden lg:flex items-center gap-6 text-[12px] tracking-[0.16em] uppercase">
+            <span className="flex items-center gap-2"><span className="w-6 h-6 rounded-full bg-black text-white flex items-center justify-center text-[10px]">✓</span> Basket</span>
+            <span className="text-stone-300">—</span>
+            <span className="font-bold flex items-center gap-2"><span style={{ background: BRAND_RED }} className="text-white w-6 h-6 rounded-full flex items-center justify-center text-[10px]">2</span> Delivery & Payment</span>
+            <span className="text-stone-300">—</span>
+            <span className="text-stone-400 flex items-center gap-2"><span className="w-6 h-6 rounded-full border border-stone-300 flex items-center justify-center text-[10px]">3</span> Confirm</span>
+          </div>
+          <div className="text-[11px] lg:text-[12px] flex items-center gap-1.5 lg:gap-2"><Icon name="shield" size={13} /> Secure</div>
+        </div>
+      </header>
+
+      {/* Mobile collapsible order summary */}
+      <button onClick={() => setSummaryOpen(!summaryOpen)} className="lg:hidden w-full px-4 py-3 bg-stone-50 border-b flex items-center justify-between" style={{ borderColor: RULE }}>
+        <div className="flex items-center gap-2 text-[13px]">
+          <Icon name="shopping-bag" size={15} />
+          <span>{summaryOpen ? "Hide" : "Show"} order summary</span>
+          <Icon name={summaryOpen ? "chevron-up" : "chevron-down"} size={15} />
+        </div>
+        <span className="font-black text-[18px]" style={{ fontFamily: "'Archivo Black', system-ui" }}>£2,426.30</span>
+      </button>
+      {summaryOpen && (
+        <div className="lg:hidden bg-white border-b p-4 space-y-3" style={{ borderColor: RULE }}>
+          {[PRODUCTS[1], PRODUCTS[0], PRODUCTS[5]].map((p, i) => (
+            <div key={i} className="flex gap-3 text-[12px]">
+              <div className="relative shrink-0">
+                <img src={p.img} className="w-14 h-14 object-cover" />
+                <span className="absolute -top-1.5 -right-1.5 bg-black text-white w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center">{[2, 1, 4][i]}</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-bold leading-tight line-clamp-1">{p.name}</div>
+                <div className="text-stone-500 text-[11px] line-clamp-1">{p.sub}</div>
+              </div>
+              <div className="font-bold whitespace-nowrap">{fmt(p.price * [2, 1, 4][i])}</div>
+            </div>
+          ))}
+          <div className="border-t pt-3 space-y-1 text-[12px]" style={{ borderColor: RULE }}>
+            <div className="flex justify-between"><span className="text-stone-500">Subtotal</span><span>£2,021.92</span></div>
+            <div className="flex justify-between"><span className="text-stone-500">VAT</span><span>£404.38</span></div>
+            <div className="flex justify-between"><span className="text-stone-500">Delivery</span><span style={{ color: BRAND_RED }} className="font-bold">FREE</span></div>
+          </div>
+        </div>
+      )}
+
+      <div className="max-w-[1400px] mx-auto px-4 lg:px-8 py-6 lg:py-10 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10">
+        <div className="lg:col-span-8 space-y-4 lg:space-y-6">
+          {/* Express checkout — mobile */}
+          <div className="lg:hidden grid grid-cols-2 gap-3">
+            <button className="h-12 bg-black text-white text-[13px] font-bold rounded">  Pay</button>
+            <button className="h-12 bg-[#5A31F4] text-white text-[13px] font-bold rounded">Klarna</button>
+          </div>
+          <div className="lg:hidden flex items-center gap-3 text-[11px] text-stone-500">
+            <span className="flex-1 h-px bg-stone-200" /> OR PAY BY CARD <span className="flex-1 h-px bg-stone-200" />
+          </div>
+
+          <section className="bg-white border p-5 lg:p-7" style={{ borderColor: RULE }}>
+            <div className="flex justify-between items-center mb-4 lg:mb-5">
+              <h2 className="text-base lg:text-xl font-black" style={{ fontFamily: "'Archivo Black', system-ui" }}>01 — Contact</h2>
+              <button className="text-[11px] lg:text-[12px] underline">Sign in</button>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold">Email</label>
+                <input className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" defaultValue="sarah@studiowest.co.uk" style={{ borderColor: INK }} />
+              </div>
+              <div>
+                <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold">Phone</label>
+                <input type="tel" className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" defaultValue="+44 7700 900123" style={{ borderColor: RULE }} />
+              </div>
+            </div>
+          </section>
+
+          <section className="bg-white border p-5 lg:p-7" style={{ borderColor: RULE }}>
+            <h2 className="text-base lg:text-xl font-black mb-4 lg:mb-5" style={{ fontFamily: "'Archivo Black', system-ui" }}>02 — Delivery</h2>
+            <div className="grid grid-cols-2 gap-3 lg:gap-4">
+              <div>
+                <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold">First Name</label>
+                <input className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" defaultValue="Sarah" style={{ borderColor: RULE }} />
+              </div>
+              <div>
+                <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold">Last Name</label>
+                <input className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" defaultValue="Mahmood" style={{ borderColor: RULE }} />
+              </div>
+              <div className="col-span-2">
+                <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold">Company (optional)</label>
+                <input className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" defaultValue="Studio West" style={{ borderColor: RULE }} />
+              </div>
+              <div className="col-span-2">
+                <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold">Postcode</label>
+                <div className="flex gap-2">
+                  <input className="flex-1 border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" defaultValue="E2 8LR" style={{ borderColor: RULE }} />
+                  <button className="text-[11px] font-bold tracking-wider uppercase border-b-2 px-3 mt-1" style={{ borderColor: INK }}>Find →</button>
+                </div>
+              </div>
+              <div className="col-span-2">
+                <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold">Address</label>
+                <input className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" defaultValue="14 Granby Street" style={{ borderColor: RULE }} />
+              </div>
+              <div className="col-span-2">
+                <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold">City</label>
+                <input className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" defaultValue="London" style={{ borderColor: RULE }} />
+              </div>
+            </div>
+
+            <div className="mt-6 lg:mt-7">
+              <div className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold mb-3">Delivery method</div>
+              {[
+                { h: "Standard delivery", s: "3–5 working days · Doorstep", p: "FREE", sel: true },
+                { h: "Premium with assembly", s: "5–7 days · Two-person team installs", p: "£89.00" },
+                { h: "Saturday delivery", s: "Pre-9am slot available", p: "£35.00" },
+              ].map((d, i) => (
+                <label key={i} className={`flex items-center gap-3 lg:gap-4 p-3 lg:p-4 border-2 mb-2 cursor-pointer ${d.sel ? "border-black bg-stone-50" : "border-stone-200"}`}>
+                  <input type="radio" name="del" defaultChecked={d.sel} className="w-4 h-4 lg:w-5 lg:h-5" />
+                  <div className="flex-1">
+                    <div className="text-[13px] lg:text-[14px] font-bold">{d.h}</div>
+                    <div className="text-[11px] lg:text-[12px] text-stone-500">{d.s}</div>
+                  </div>
+                  <div className="font-bold text-[13px] lg:text-[14px]" style={{ color: d.p === "FREE" ? BRAND_RED : INK }}>{d.p}</div>
+                </label>
+              ))}
+            </div>
+          </section>
+
+          <section className="bg-white border p-5 lg:p-7" style={{ borderColor: RULE }}>
+            <h2 className="text-base lg:text-xl font-black mb-4 lg:mb-5" style={{ fontFamily: "'Archivo Black', system-ui" }}>03 — Payment</h2>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-5">
+              {["Card", "PayPal", "Klarna", "Trade A/C"].map((m, i) => (
+                <button key={m} className={`py-2.5 lg:py-3 text-[11px] lg:text-[12px] font-bold tracking-wider uppercase border-2 ${i === 0 ? "border-black bg-black text-white" : "border-stone-200"}`}>
+                  {m}
+                </button>
+              ))}
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold">Card number</label>
+                <input inputMode="numeric" className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black tracking-wider text-[14px]" placeholder="1234  5678  9012  3456" style={{ borderColor: RULE }} />
+              </div>
+              <div className="grid grid-cols-3 gap-3 lg:gap-4">
+                <div>
+                  <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold">Expiry</label>
+                  <input inputMode="numeric" className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" placeholder="MM/YY" style={{ borderColor: RULE }} />
+                </div>
+                <div>
+                  <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold">CVC</label>
+                  <input inputMode="numeric" className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" placeholder="000" style={{ borderColor: RULE }} />
+                </div>
+                <div>
+                  <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold">Postcode</label>
+                  <input className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" placeholder="SW1A" style={{ borderColor: RULE }} />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Mobile place-order — sticky bottom */}
+          <button className="hidden lg:flex w-full py-4 text-white text-[13px] font-bold tracking-[0.16em] uppercase items-center justify-center gap-2" style={{ background: BRAND_RED }}>
+            Place Order — £2,426.30 <Icon name="arrow-right" size={15} />
+          </button>
+        </div>
+
+        {/* Desktop summary */}
+        <div className="hidden lg:block lg:col-span-4">
+          <div className="bg-black text-white p-7 sticky top-4">
+            <h3 className="text-xl font-black mb-5" style={{ fontFamily: "'Archivo Black', system-ui" }}>Your Order</h3>
+            <div className="space-y-3 pb-5 border-b border-stone-800">
+              {[PRODUCTS[1], PRODUCTS[0], PRODUCTS[5]].map((p, i) => (
+                <div key={i} className="flex gap-3 text-[12px]">
+                  <div className="relative">
+                    <img src={p.img} className="w-14 h-14 object-cover" />
+                    <span className="absolute -top-1 -right-1 bg-white text-black w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center">{[2, 1, 4][i]}</span>
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-bold leading-tight">{p.name.slice(0, 28)}…</div>
+                    <div className="text-stone-400 text-[11px]">{p.sub}</div>
+                  </div>
+                  <div className="font-bold">{fmt(p.price * [2, 1, 4][i])}</div>
+                </div>
+              ))}
+            </div>
+            <div className="space-y-2 py-5 text-[13px] border-b border-stone-800">
+              <div className="flex justify-between"><span className="text-stone-400">Subtotal</span><span>£2,021.92</span></div>
+              <div className="flex justify-between"><span className="text-stone-400">VAT</span><span>£404.38</span></div>
+              <div className="flex justify-between"><span className="text-stone-400">Delivery</span><span style={{ color: BRAND_RED }} className="font-bold">FREE</span></div>
+            </div>
+            <div className="flex justify-between items-baseline py-5">
+              <span className="text-[13px] tracking-wider uppercase">Total</span>
+              <span className="text-3xl font-black" style={{ fontFamily: "'Archivo Black', system-ui" }}>£2,426.30</span>
+            </div>
+            <button className="w-full py-4 text-white text-[13px] font-bold tracking-[0.16em] uppercase flex items-center justify-center gap-2" style={{ background: BRAND_RED }}>
+              Place Order <Icon name="arrow-right" size={15} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile sticky place-order bar */}
+      <div className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t p-3" style={{ borderColor: RULE, paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)" }}>
+        <button className="w-full py-3.5 text-white text-[13px] font-bold tracking-[0.14em] uppercase flex items-center justify-center gap-2" style={{ background: BRAND_RED }}>
+          Place Order — £2,426.30 <Icon name="arrow-right" size={15} />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// =============================================================================
+// CRM: Mobile-aware sidebar drawer
+// =============================================================================
+const CRMSidebar = ({ activePage = "products", onNav, mobileOpen, onCloseMobile }) => {
+  const items = [
+    { i: "bar-chart-3", l: "Dashboard", id: "dashboard" },
+    { i: "boxes", l: "Products", id: "products", badge: "428" },
+    { i: "shopping-cart", l: "Orders", id: "orders", badge: "12" },
+    { i: "users", l: "Customers", id: "customers" },
+    { i: "tag", l: "Promotions", id: "promotions" },
+    { i: "trending-up", l: "Analytics", id: "analytics" },
+    { i: "settings", l: "Settings", id: "settings" },
+  ];
+
+  const sidebarContent = (
+    <div className="bg-black text-white flex flex-col h-full">
+      <div className="p-5 lg:p-6 border-b border-stone-800 flex items-center justify-between">
+        <div>
+          <Logo className="h-7 lg:h-8 brightness-0 invert" />
+          <div className="text-[10px] tracking-[0.22em] uppercase mt-1.5 lg:mt-2" style={{ color: BRAND_RED }}>Admin Console</div>
+        </div>
+        {mobileOpen && <button onClick={onCloseMobile} className="lg:hidden w-9 h-9 flex items-center justify-center"><Icon name="x" size={20} /></button>}
+      </div>
+      <nav className="flex-1 py-4 overflow-y-auto">
+        {items.map((x) => (
+          <button key={x.l} onClick={() => onNav && onNav(x.id)}
+            className={`w-full px-5 lg:px-6 py-3 flex items-center gap-3 text-[13px] ${activePage === x.id ? "border-l-2 bg-stone-900" : "border-l-2 border-transparent hover:bg-stone-900"}`}
+            style={{ borderLeftColor: activePage === x.id ? BRAND_RED : "transparent" }}>
+            <Icon name={x.i} size={16} />
+            <span className="flex-1 text-left">{x.l}</span>
+            {x.badge && <span className="text-[10px] bg-stone-700 px-1.5 py-0.5 rounded">{x.badge}</span>}
+          </button>
+        ))}
+      </nav>
+      <div className="p-4 border-t border-stone-800 flex items-center gap-3">
+        <div className="w-9 h-9 rounded-full bg-stone-700 flex items-center justify-center text-[12px] font-bold">JM</div>
+        <div className="flex-1">
+          <div className="text-[12px] font-bold">James Mistry</div>
+          <div className="text-[10px] text-stone-500">Admin · 14:32</div>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Desktop fixed sidebar */}
+      <aside className="hidden lg:flex w-64 shrink-0">{sidebarContent}</aside>
+      {/* Mobile drawer */}
+      {mobileOpen && (
+        <div className="lg:hidden fixed inset-0 z-[100] fade-in">
+          <div className="absolute inset-0 bg-black/60" onClick={onCloseMobile} />
+          <div className="absolute inset-y-0 left-0 w-[80%] max-w-[300px] slide-up" style={{ animation: "slideUp 0.25s ease-out" }}>{sidebarContent}</div>
+        </div>
+      )}
+    </>
+  );
+};
+
+// =============================================================================
+// SCREEN: CRM DASHBOARD
+// =============================================================================
+const CRMScreen = ({ go }) => {
+  const [navOpen, setNavOpen] = useState(false);
+  return (
+    <div className="min-h-screen flex" style={{ background: "#F4F2EE" }}>
+      <CRMSidebar mobileOpen={navOpen} onCloseMobile={() => setNavOpen(false)} />
+
+      <main className="flex-1 overflow-x-hidden min-w-0">
+        {/* Top bar */}
+        <div className="bg-white border-b sticky top-0 z-30" style={{ borderColor: RULE }}>
+          <div className="flex items-center justify-between px-4 lg:px-8 py-3 lg:py-4 gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <button onClick={() => setNavOpen(true)} className="lg:hidden w-10 h-10 -ml-2 flex items-center justify-center"><Icon name="menu" size={20} /></button>
+              <div className="min-w-0">
+                <div className="text-[10px] lg:text-[11px] tracking-wider uppercase text-stone-500">Catalogue</div>
+                <h1 className="text-lg lg:text-2xl font-black mt-0.5 truncate" style={{ fontFamily: "'Archivo Black', system-ui" }}>Product Manager</h1>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 lg:gap-3">
+              <button onClick={() => go("crm-upload")} className="px-3 lg:px-5 py-2 lg:py-2.5 text-white text-[11px] lg:text-[12px] font-bold tracking-wider uppercase flex items-center gap-1.5 lg:gap-2" style={{ background: BRAND_RED }}>
+                <Icon name="plus" size={13} /> <span className="hidden sm:inline">Add Product</span><span className="sm:hidden">Add</span>
+              </button>
+              <button className="hidden lg:flex px-4 py-2.5 border border-black text-[12px] font-bold tracking-wider uppercase items-center gap-2">
+                <Icon name="cloud-upload" size={14} /> Bulk Import
+              </button>
+            </div>
+          </div>
+          {/* Search */}
+          <div className="px-4 lg:px-8 pb-3 lg:hidden">
+            <div className="relative">
+              <Icon name="search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+              <input placeholder="Search SKUs, names…" className="w-full pl-9 pr-4 py-2.5 bg-stone-100 border border-transparent focus:bg-white focus:border-black text-[13px] outline-none" />
+            </div>
+          </div>
+        </div>
+
+        {/* Stats — 2x2 on mobile, 4-up on desktop */}
+        <div className="px-4 lg:px-8 py-4 lg:py-6 grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+          {[
+            { k: "Live products", v: "412", d: "+8 this week", warn: false },
+            { k: "Drafts", v: "16", d: "Need photos", warn: true },
+            { k: "Low stock", v: "9", d: "<5 units", warn: true },
+            { k: "Used inventory", v: "190", d: "£124k retail", warn: false },
+          ].map(s => (
+            <div key={s.k} className="bg-white border p-3 lg:p-5" style={{ borderColor: RULE }}>
+              <div className="text-[10px] lg:text-[11px] tracking-wider uppercase text-stone-500">{s.k}</div>
+              <div className="text-2xl lg:text-3xl font-black mt-0.5 lg:mt-1" style={{ fontFamily: "'Archivo Black', system-ui" }}>{s.v}</div>
+              <div className={`text-[10px] lg:text-[11px] mt-0.5 lg:mt-1 flex items-center gap-1 ${s.warn ? "text-amber-700" : "text-emerald-700"}`}>
+                <Icon name={s.warn ? "alert-circle" : "trending-up"} size={10} /> {s.d}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Filter pills */}
+        <div className="px-4 lg:px-8 flex items-center gap-2 mb-4 overflow-x-auto hide-scrollbar">
+          {[
+            { l: "All", c: "428", active: true },
+            { l: "New", c: "238" }, { l: "Used", c: "190" },
+            { l: "Drafts", c: "16" }, { l: "Out", c: "4" }, { l: "Archived", c: "32" },
+          ].map(t => (
+            <button key={t.l} className={`shrink-0 px-3 lg:px-4 py-1.5 text-[11px] lg:text-[12px] font-bold tracking-wider uppercase ${t.active ? "bg-black text-white" : "bg-white border"}`} style={{ borderColor: RULE }}>
+              {t.l} <span className="opacity-60 ml-1">{t.c}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Mobile: card list. Desktop: table */}
+        <div className="lg:hidden px-4 space-y-2 pb-4">
+          {/* Helpful note */}
+          <div className="bg-amber-50 border border-amber-200 p-3 rounded text-[12px] text-amber-900 mb-3 flex gap-2">
+            <Icon name="info" size={14} className="shrink-0 mt-0.5" />
+            <span>Tap a product to edit. Use desktop for bulk actions and CSV import.</span>
+          </div>
+          {CRM_PRODUCTS.map((p, i) => (
+            <button key={i} onClick={() => go("crm-upload")} className="w-full bg-white border p-3 flex gap-3 text-left" style={{ borderColor: RULE }}>
+              <div className="w-16 h-16 bg-stone-100 border relative shrink-0" style={{ borderColor: RULE }}>
+                <img src={PRODUCTS[i % PRODUCTS.length].img} className="w-full h-full object-cover" />
+                <span className="absolute -bottom-1 -right-1 bg-black text-white text-[9px] px-1 rounded-full">+{p.images}</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-bold leading-tight line-clamp-2">{p.name}</div>
+                    <div className="text-[10px] font-mono text-stone-500 mt-0.5">{p.sku}</div>
+                  </div>
+                  <Pill tone={p.status === "Live" ? "green" : "amber"}>{p.status}</Pill>
+                </div>
+                <div className="flex items-center justify-between mt-2 text-[12px]">
+                  <span className={`px-1.5 py-0.5 text-[10px] font-bold ${p.condition.includes("Used") ? "text-white" : "bg-stone-200"}`} style={p.condition.includes("Used") ? { background: BRAND_RED } : {}}>{p.condition}</span>
+                  <div className="flex items-baseline gap-3">
+                    <span className={p.stock < 5 ? "text-amber-700 font-bold" : "text-stone-500"}>{p.stock} in stock</span>
+                    <span className="font-bold">{fmt(p.price)}</span>
+                  </div>
+                </div>
+              </div>
+            </button>
+          ))}
+          <div className="text-center text-[11px] text-stone-500 pt-3">Showing 6 of 428 · Load more</div>
+        </div>
+
+        {/* Desktop table */}
+        <div className="hidden lg:block mx-8 mb-8 bg-white border" style={{ borderColor: RULE }}>
+          <div className="grid gap-4 px-5 py-3 border-b text-[10px] tracking-[0.18em] uppercase text-stone-500" style={{ borderColor: RULE, gridTemplateColumns: "32px 64px 2fr 1fr 80px 80px 100px 80px 60px" }}>
+            <div><input type="checkbox" /></div>
+            <div>Image</div><div>Product</div><div>SKU</div>
+            <div className="text-right">Price</div><div className="text-right">Stock</div>
+            <div>Status</div><div>Updated</div><div></div>
+          </div>
+          {CRM_PRODUCTS.map((p, i) => (
+            <div key={i} className="grid gap-4 px-5 py-3 border-b items-center hover:bg-stone-50 text-[13px]" style={{ borderColor: RULE, gridTemplateColumns: "32px 64px 2fr 1fr 80px 80px 100px 80px 60px" }}>
+              <div><input type="checkbox" /></div>
+              <div>
+                <div className="w-12 h-12 bg-stone-100 border relative" style={{ borderColor: RULE }}>
+                  <img src={PRODUCTS[i % PRODUCTS.length].img} className="w-full h-full object-cover" />
+                  <span className="absolute -bottom-1 -right-1 bg-black text-white text-[9px] px-1 rounded-full">+{p.images}</span>
+                </div>
+              </div>
+              <div>
+                <div className="font-bold leading-tight">{p.name}</div>
+                <div className="text-[11px] text-stone-500 mt-0.5 flex items-center gap-2">
+                  <span className={`px-1.5 py-0.5 ${p.condition.includes("Used") ? "text-white" : "bg-stone-200"}`} style={p.condition.includes("Used") ? { background: BRAND_RED } : {}}>{p.condition}</span>
+                </div>
+              </div>
+              <div className="font-mono text-[11px] text-stone-500">{p.sku}</div>
+              <div className="text-right font-bold">{fmt(p.price)}</div>
+              <div className="text-right"><span className={p.stock < 5 ? "text-amber-700 font-bold" : ""}>{p.stock}</span></div>
+              <div><Pill tone={p.status === "Live" ? "green" : "amber"}>{p.status}</Pill></div>
+              <div className="text-[11px] text-stone-500">{p.updated}</div>
+              <div className="flex justify-end gap-1">
+                <button onClick={() => go("crm-upload")} className="p-1.5 hover:bg-stone-200"><Icon name="edit-3" size={13} /></button>
+                <button className="p-1.5 hover:bg-stone-200"><Icon name="more-horizontal" size={13} /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </main>
+    </div>
+  );
+};
+
+// =============================================================================
+// SCREEN: CRM UPLOAD (mobile-first reorder)
+// =============================================================================
+const CRMUploadScreen = ({ go }) => {
+  const [navOpen, setNavOpen] = useState(false);
+  return (
+    <div className="min-h-screen flex pb-20 lg:pb-0" style={{ background: "#F4F2EE" }}>
+      <CRMSidebar mobileOpen={navOpen} onCloseMobile={() => setNavOpen(false)} />
+
+      <main className="flex-1 overflow-x-hidden min-w-0">
+        <div className="bg-white border-b sticky top-0 z-30" style={{ borderColor: RULE }}>
+          <div className="flex items-center justify-between px-4 lg:px-8 py-3 lg:py-4 gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <button onClick={() => setNavOpen(true)} className="lg:hidden w-10 h-10 -ml-2 flex items-center justify-center"><Icon name="menu" size={20} /></button>
+              <button onClick={() => go("crm")} className="hidden lg:block text-[11px] tracking-wider uppercase text-stone-500 hover:underline">← Back</button>
+              <button onClick={() => go("crm")} className="lg:hidden w-9 h-9 -ml-2 flex items-center justify-center"><Icon name="chevron-left" size={20} /></button>
+              <div className="min-w-0">
+                <div className="text-[10px] lg:hidden tracking-wider uppercase text-stone-500">New product</div>
+                <h1 className="text-base lg:text-2xl font-black truncate" style={{ fontFamily: "'Archivo Black', system-ui" }}>New Product</h1>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 lg:gap-3">
+              <span className="hidden lg:inline text-[11px] text-stone-500">Auto-saved 14s ago</span>
+              <button className="hidden lg:block px-4 py-2 text-[12px] font-bold tracking-wider uppercase border border-stone-300">Save Draft</button>
+              <button className="px-3 lg:px-5 py-2 text-white text-[11px] lg:text-[12px] font-bold tracking-wider uppercase whitespace-nowrap" style={{ background: BRAND_RED }}>
+                <span className="hidden lg:inline">Publish Live →</span><span className="lg:hidden">Publish</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-4 lg:px-8 py-4 lg:py-6 grid grid-cols-1 xl:grid-cols-12 gap-4 lg:gap-6">
+          <div className="xl:col-span-8 space-y-4 lg:space-y-6">
+            {/* PHOTOS — the centerpiece, biggest on mobile */}
+            <div className="bg-white border" style={{ borderColor: RULE }}>
+              <div className="px-4 lg:px-6 py-3 lg:py-4 border-b flex justify-between items-center" style={{ borderColor: RULE }}>
+                <div>
+                  <h2 className="text-base lg:text-lg font-black" style={{ fontFamily: "'Archivo Black', system-ui" }}>Photos</h2>
+                  <p className="text-[10px] lg:text-[11px] text-stone-500">First image is hero · Up to 30 photos</p>
+                </div>
+                <div className="hidden sm:flex items-center gap-1.5 px-2 lg:px-3 py-1.5 text-[10px] lg:text-[11px]" style={{ background: "#FFF7E6", color: "#9B5A00" }}>
+                  <Icon name="sparkles" size={11} /> AI on
+                </div>
+              </div>
+              <div className="p-4 lg:p-6">
+                {/* Mobile-prominent capture buttons */}
+                <div className="lg:hidden grid grid-cols-2 gap-2 mb-3">
+                  <button className="aspect-[4/3] bg-black text-white flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-transform">
+                    <Icon name="camera" size={28} />
+                    <span className="text-[12px] font-bold tracking-wider uppercase">Take Photo</span>
+                    <span className="text-[10px] opacity-70">Use phone camera</span>
+                  </button>
+                  <button className="aspect-[4/3] border-2 border-black flex flex-col items-center justify-center gap-1.5">
+                    <Icon name="image" size={28} />
+                    <span className="text-[12px] font-bold tracking-wider uppercase">From Library</span>
+                    <span className="text-[10px] text-stone-500">Pick existing</span>
+                  </button>
+                </div>
+
+                {/* Drop zone — desktop primary */}
+                <div className="hidden lg:block border-2 border-dashed p-8 text-center mb-5 bg-stone-50" style={{ borderColor: "#C8C2B6" }}>
+                  <Icon name="cloud-upload" size={36} className="mx-auto text-stone-400" />
+                  <div className="text-[14px] font-bold mt-3">Drop photos here, or paste from clipboard</div>
+                  <div className="text-[12px] text-stone-500 mt-1">JPG · PNG · HEIC up to 20MB · Auto-resized & background-removed</div>
+                  <div className="flex gap-2 justify-center mt-4">
+                    <button className="px-4 py-2 bg-black text-white text-[11px] font-bold tracking-wider uppercase">Choose Files</button>
+                    <button className="px-4 py-2 border text-[11px] font-bold tracking-wider uppercase" style={{ borderColor: RULE }}>From Phone (QR)</button>
+                    <button className="px-4 py-2 border text-[11px] font-bold tracking-wider uppercase" style={{ borderColor: RULE }}>From URL / Supplier</button>
+                  </div>
+                </div>
+
+                {/* Mobile alt-source row */}
+                <div className="lg:hidden flex gap-2 mb-3 text-[11px]">
+                  <button className="flex-1 py-2 border flex items-center justify-center gap-1.5" style={{ borderColor: RULE }}>
+                    <Icon name="link" size={12} /> From URL
+                  </button>
+                  <button className="flex-1 py-2 border flex items-center justify-center gap-1.5" style={{ borderColor: RULE }}>
+                    <Icon name="qr-code" size={12} /> Send to Phone
+                  </button>
+                </div>
+
+                {/* Thumbnail grid — 3 cols mobile, 6 cols desktop */}
+                <div className="grid grid-cols-3 lg:grid-cols-6 gap-2 lg:gap-3">
+                  {[
+                    { i: PRODUCTS[1].img, hero: true, status: "Processed" },
+                    { i: PRODUCTS[5].img, status: "Processed" },
+                    { i: PRODUCTS[2].img, status: "BG removed" },
+                    { i: PRODUCTS[0].img, status: "Processed" },
+                    { i: PRODUCTS[4].img, status: "Processed" },
+                    { i: PRODUCTS[6].img, status: "Uploading", progress: 64 },
+                  ].map((img, i) => (
+                    <div key={i} className="relative group aspect-square bg-stone-100 border" style={{ borderColor: RULE }}>
+                      <img src={img.i} className="w-full h-full object-cover" />
+                      {img.hero && <div className="absolute top-1 left-1 bg-black text-white text-[9px] font-bold tracking-wider uppercase px-1.5 py-0.5">Hero</div>}
+                      {img.progress && (
+                        <div className="absolute inset-0 bg-black/50 flex flex-col items-end justify-end p-1.5">
+                          <div className="text-white text-[10px] font-bold mb-1">{img.progress}%</div>
+                          <div className="w-full h-0.5 bg-white/30">
+                            <div className="h-full bg-white" style={{ width: `${img.progress}%` }} />
+                          </div>
+                        </div>
+                      )}
+                      <button className="absolute top-1 right-1 w-5 h-5 bg-white/90 lg:hidden flex lg:group-hover:flex items-center justify-center"><Icon name="x" size={10} /></button>
+                    </div>
+                  ))}
+                  <button className="aspect-square border-2 border-dashed flex flex-col items-center justify-center text-stone-400 hover:border-black hover:text-black" style={{ borderColor: "#C8C2B6" }}>
+                    <Icon name="plus" size={20} />
+                    <span className="text-[9px] lg:text-[10px] mt-0.5 lg:mt-1">Add more</span>
+                  </button>
+                </div>
+
+                <div className="mt-4 lg:mt-5 p-3 lg:p-4 border-l-4" style={{ borderColor: BRAND_RED, background: "#FFF5F5" }}>
+                  <div className="flex items-start gap-2 lg:gap-3">
+                    <Icon name="sparkles" size={15} style={{ color: BRAND_RED }} className="mt-0.5 shrink-0" />
+                    <div className="flex-1">
+                      <div className="text-[12px] font-bold">AI suggestions ready</div>
+                      <div className="text-[12px] text-stone-700 mt-1 leading-relaxed">Detected: <strong>Office chair</strong> · Black mesh · Likely Aeron — <button className="underline font-bold">apply tags</button> · <button className="underline font-bold">draft description</button></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* DETAILS */}
+            <div className="bg-white border" style={{ borderColor: RULE }}>
+              <div className="px-4 lg:px-6 py-3 lg:py-4 border-b" style={{ borderColor: RULE }}>
+                <h2 className="text-base lg:text-lg font-black" style={{ fontFamily: "'Archivo Black', system-ui" }}>Details</h2>
+              </div>
+              <div className="p-4 lg:p-6 space-y-4 lg:space-y-5">
+                <div>
+                  <label className="text-[10px] lg:text-[11px] font-bold tracking-wider uppercase">Product Title</label>
+                  <input className="w-full border-b-2 py-2.5 mt-1 text-[15px] lg:text-[16px] font-bold focus:outline-none focus:border-black" defaultValue="Herman Miller Aeron Chair — Size B" style={{ borderColor: RULE }} />
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5">
+                  <div>
+                    <label className="text-[10px] lg:text-[11px] font-bold tracking-wider uppercase">SKU</label>
+                    <input className="w-full border-b-2 py-2.5 mt-1 font-mono text-[13px] focus:outline-none focus:border-black" defaultValue="DDS-USED-AER-014" style={{ borderColor: RULE }} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] lg:text-[11px] font-bold tracking-wider uppercase">Brand</label>
+                    <input className="w-full border-b-2 py-2.5 mt-1 focus:outline-none focus:border-black" defaultValue="Herman Miller" style={{ borderColor: RULE }} />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] lg:text-[11px] font-bold tracking-wider uppercase">Description</label>
+                  <div className="border mt-1" style={{ borderColor: RULE }}>
+                    <div className="border-b px-2 py-1 flex gap-1 text-[11px] overflow-x-auto" style={{ borderColor: RULE }}>
+                      <button className="px-2 py-1 font-bold shrink-0">B</button>
+                      <button className="px-2 py-1 italic shrink-0">I</button>
+                      <button className="px-2 py-1 underline shrink-0">U</button>
+                      <button className="ml-auto px-2 py-1 flex items-center gap-1 text-[10px] font-bold whitespace-nowrap" style={{ color: BRAND_RED }}>
+                        <Icon name="sparkles" size={11} /> AI Draft
+                      </button>
+                    </div>
+                    <textarea rows={4} className="w-full p-3 text-[13px] focus:outline-none resize-none" defaultValue="The Aeron is the chair that defined the modern office. Fully refurbished — gas lift, tilt mechanism and casters all replaced. Pellicle mesh inspected and cleaned. 12-month guarantee." />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* CONDITION */}
+            <div className="bg-white border" style={{ borderColor: RULE }}>
+              <div className="px-4 lg:px-6 py-3 lg:py-4 border-b flex items-center justify-between gap-2" style={{ borderColor: RULE }}>
+                <div className="min-w-0">
+                  <h2 className="text-base lg:text-lg font-black" style={{ fontFamily: "'Archivo Black', system-ui" }}>Condition Report</h2>
+                  <p className="text-[10px] lg:text-[11px] text-stone-500">Required for used items</p>
+                </div>
+                <Pill tone="red">Used Item</Pill>
+              </div>
+              <div className="p-4 lg:p-6 space-y-4">
+                <div>
+                  <label className="text-[10px] lg:text-[11px] font-bold tracking-wider uppercase">Grade</label>
+                  <div className="grid grid-cols-3 gap-2 mt-2">
+                    {[{ g: "A", d: "As new" }, { g: "B", d: "Light wear", sel: true }, { g: "C", d: "Honest wear" }].map(x => (
+                      <label key={x.g} className={`p-2.5 lg:p-3 border-2 cursor-pointer ${x.sel ? "border-black bg-stone-50" : "border-stone-200"}`}>
+                        <input type="radio" name="grade" defaultChecked={x.sel} className="hidden" />
+                        <div className="text-[13px] lg:text-[14px] font-black">Grade {x.g}</div>
+                        <div className="text-[10px] lg:text-[11px] text-stone-500 mt-0.5">{x.d}</div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] lg:text-[11px] font-bold tracking-wider uppercase">Disclosed faults</label>
+                  <textarea rows={2} className="w-full border p-3 mt-1 text-[13px] focus:outline-none focus:border-black" defaultValue="Minor scuffing on right armrest. Small ink mark on rear mesh." style={{ borderColor: RULE }} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN — collapses below on smaller screens */}
+          <div className="xl:col-span-4 space-y-4 lg:space-y-5">
+            <div className="bg-white border p-4 lg:p-5" style={{ borderColor: RULE }}>
+              <h3 className="text-[13px] lg:text-[14px] font-black tracking-wider uppercase mb-3 lg:mb-4" style={{ fontFamily: "'Archivo Black', system-ui" }}>Pricing</h3>
+              <div className="space-y-3 lg:space-y-4 text-[13px]">
+                <div>
+                  <label className="text-[10px] lg:text-[11px] font-bold tracking-wider uppercase">Sale Price (inc. VAT)</label>
+                  <div className="flex items-center border-b-2 mt-1" style={{ borderColor: INK }}>
+                    <span className="text-[18px] font-black pr-2">£</span>
+                    <input inputMode="decimal" className="flex-1 py-2 text-[18px] font-black focus:outline-none" defaultValue="485.00" style={{ fontFamily: "'Archivo Black', system-ui" }} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] lg:text-[11px] font-bold tracking-wider uppercase">Was</label>
+                    <input inputMode="decimal" className="w-full border-b py-2 mt-1 focus:outline-none focus:border-black" defaultValue="1295.00" style={{ borderColor: RULE }} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] lg:text-[11px] font-bold tracking-wider uppercase">Cost</label>
+                    <input inputMode="decimal" className="w-full border-b py-2 mt-1 focus:outline-none focus:border-black" defaultValue="180.00" style={{ borderColor: RULE }} />
+                  </div>
+                </div>
+                <div className="bg-stone-50 p-3 border-l-2 border-black">
+                  <div className="flex justify-between text-[11px]"><span className="text-stone-500">Margin</span><span className="font-bold">62.9%</span></div>
+                  <div className="flex justify-between text-[11px] mt-1"><span className="text-stone-500">Profit</span><span className="font-bold">£305.00</span></div>
+                  <div className="flex justify-between text-[11px] mt-1"><span className="text-stone-500">Save vs RRP</span><span className="font-bold" style={{ color: BRAND_RED }}>62%</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white border p-4 lg:p-5" style={{ borderColor: RULE }}>
+              <h3 className="text-[13px] lg:text-[14px] font-black tracking-wider uppercase mb-3 lg:mb-4" style={{ fontFamily: "'Archivo Black', system-ui" }}>Inventory</h3>
+              <div className="space-y-3 text-[13px]">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] lg:text-[11px] font-bold tracking-wider uppercase">In Stock</label>
+                    <input inputMode="numeric" className="w-full border-b-2 py-2 mt-1 text-[16px] font-bold focus:outline-none focus:border-black" defaultValue="3" style={{ borderColor: RULE }} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] lg:text-[11px] font-bold tracking-wider uppercase">Low Alert</label>
+                    <input inputMode="numeric" className="w-full border-b-2 py-2 mt-1 text-[16px] font-bold focus:outline-none focus:border-black" defaultValue="1" style={{ borderColor: RULE }} />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] lg:text-[11px] font-bold tracking-wider uppercase">Warehouse Location</label>
+                  <input className="w-full border-b py-2 mt-1 focus:outline-none focus:border-black" defaultValue="Bay 4 · Shelf C-12" style={{ borderColor: RULE }} />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white border p-4 lg:p-5" style={{ borderColor: RULE }}>
+              <h3 className="text-[13px] lg:text-[14px] font-black tracking-wider uppercase mb-3 lg:mb-4" style={{ fontFamily: "'Archivo Black', system-ui" }}>Categorisation</h3>
+              <div className="space-y-3 text-[13px]">
+                <div>
+                  <label className="text-[10px] lg:text-[11px] font-bold tracking-wider uppercase">Category</label>
+                  <select className="w-full border-b-2 py-2 mt-1 bg-transparent focus:outline-none focus:border-black" style={{ borderColor: RULE }}>
+                    <option>Seating › Office Chairs › Posture</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] lg:text-[11px] font-bold tracking-wider uppercase">Tags</label>
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {["aeron", "ergonomic", "mesh", "graphite", "refurb"].map(t => (
+                      <span key={t} className="px-2 py-1 bg-stone-100 text-[11px] flex items-center gap-1">{t} <Icon name="x" size={10} /></span>
+                    ))}
+                    <button className="px-2 py-1 border border-dashed text-[11px] text-stone-500" style={{ borderColor: "#C8C2B6" }}>+ Add</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      {/* MOBILE STICKY ACTION BAR */}
+      <div className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t flex" style={{ borderColor: RULE, paddingBottom: "env(safe-area-inset-bottom)" }}>
+        <button className="flex-1 py-3.5 text-[12px] font-bold tracking-wider uppercase border-r" style={{ borderColor: RULE }}>Save Draft</button>
+        <button className="flex-1 py-3.5 text-white text-[12px] font-bold tracking-wider uppercase" style={{ background: BRAND_RED }}>Publish Live →</button>
+      </div>
+    </div>
+  );
+};
+
+// =============================================================================
+// APP
+// =============================================================================
+const SCREENS = [
+  { id: "home", label: "1 · Home", group: "site" },
+  { id: "new", label: "2 · New", group: "site" },
+  { id: "used", label: "3 · Used", group: "site" },
+  { id: "product", label: "4 · Product", group: "site" },
+  { id: "basket", label: "5 · Basket", group: "site" },
+  { id: "checkout", label: "6 · Checkout", group: "site" },
+  { id: "crm", label: "7 · CRM", group: "crm" },
+  { id: "crm-upload", label: "8 · Upload", group: "crm" },
+];
+
+function App() {
+  const [screen, setScreen] = useState("home");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const go = (s) => { setScreen(s); setPickerOpen(false); window.scrollTo({ top: 0, behavior: "instant" }); };
+
+  return (
+    <div style={{ fontFamily: "'Archivo', ui-sans-serif, system-ui" }}>
+      {/* SCREEN PICKER — compact on mobile, full on desktop */}
+      <div className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b shadow-sm" style={{ borderColor: RULE }}>
+        {/* Mobile: dropdown */}
+        <div className="lg:hidden">
+          <button onClick={() => setPickerOpen(!pickerOpen)} className="w-full px-4 py-2.5 flex items-center justify-between text-[11px]">
+            <span className="flex items-center gap-2">
+              <span className="text-stone-500 tracking-[0.18em] uppercase">Mockup:</span>
+              <span className="font-bold tracking-wider uppercase">{SCREENS.find(s => s.id === screen)?.label}</span>
+            </span>
+            <Icon name={pickerOpen ? "chevron-up" : "chevron-down"} size={14} />
+          </button>
+          {pickerOpen && (
+            <div className="border-t" style={{ borderColor: RULE }}>
+              {SCREENS.map(s => (
+                <button key={s.id} onClick={() => go(s.id)}
+                  className={`w-full px-4 py-2.5 flex items-center justify-between text-[12px] font-bold tracking-wider uppercase border-b ${screen === s.id ? "text-white" : ""}`}
+                  style={{ borderColor: RULE, background: screen === s.id ? (s.group === "crm" ? BRAND_RED : "#000") : "transparent" }}>
+                  <span>{s.label}</span>
+                  <span className={`text-[9px] ${screen === s.id ? "opacity-70" : "text-stone-400"}`}>{s.group}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {/* Desktop: horizontal strip */}
+        <div className="hidden lg:flex max-w-[1400px] mx-auto px-4 py-2 items-center gap-2 overflow-x-auto screen-picker">
+          <span className="text-[10px] tracking-[0.18em] uppercase text-stone-500 shrink-0 mr-2">Mockup</span>
+          <span className="text-[10px] tracking-[0.18em] uppercase font-bold shrink-0">Website →</span>
+          {SCREENS.filter(s => s.group === "site").map(s => (
+            <button key={s.id} onClick={() => go(s.id)}
+              className={`shrink-0 px-3 py-1.5 text-[11px] font-bold tracking-wider uppercase whitespace-nowrap ${screen === s.id ? "bg-black text-white" : "border hover:bg-stone-100"}`}
+              style={{ borderColor: RULE }}>{s.label}</button>
+          ))}
+          <span className="text-[10px] tracking-[0.18em] uppercase font-bold shrink-0 ml-3" style={{ color: BRAND_RED }}>CRM →</span>
+          {SCREENS.filter(s => s.group === "crm").map(s => (
+            <button key={s.id} onClick={() => go(s.id)}
+              className={`shrink-0 px-3 py-1.5 text-[11px] font-bold tracking-wider uppercase whitespace-nowrap ${screen === s.id ? "text-white" : "border hover:bg-stone-100"}`}
+              style={screen === s.id ? { background: BRAND_RED } : { borderColor: RULE }}>{s.label}</button>
+          ))}
+        </div>
+      </div>
+
+      {screen === "home" && <HomeScreen go={go} />}
+      {screen === "new" && <CategoryScreen go={go} mode="new" />}
+      {screen === "used" && <CategoryScreen go={go} mode="used" />}
+      {screen === "product" && <ProductScreen go={go} />}
+      {screen === "basket" && <BasketScreen go={go} />}
+      {screen === "checkout" && <CheckoutScreen go={go} />}
+      {screen === "crm" && <CRMScreen go={go} />}
+      {screen === "crm-upload" && <CRMUploadScreen go={go} />}
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
