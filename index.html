@@ -4,7 +4,14 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="theme-color" content="#0A0A0A" />
-<title>Direct Desk Solutions — Mockups</title>
+<meta name="description" content="Direct Desk Solutions — UK supplier of new and refurbished office furniture. Desks, chairs, storage and meeting tables with free mainland delivery on orders over £500." />
+<meta name="format-detection" content="telephone=no" />
+<meta property="og:title" content="Direct Desk Solutions" />
+<meta property="og:description" content="New and refurbished office furniture, delivered direct across the UK." />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='5,10 100,55 5,100 25,55' fill='%23E5202A'/%3E%3Cpolygon points='25,55 60,55 45,75' fill='%23fff'/%3E%3C/svg%3E" />
+<title>Direct Desk Solutions — Office Furniture, New & Refurbished</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,700&display=swap" rel="stylesheet">
@@ -26,6 +33,10 @@
   .slide-up { animation: slideUp 0.25s ease-out; }
   @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
   .fade-in { animation: fade 0.2s ease-out; }
+  /* Prevent iOS Safari zoom-on-focus by ensuring inputs are >= 16px on mobile */
+  @media (max-width: 1023.98px) {
+    input, select, textarea { font-size: 16px !important; }
+  }
 </style>
 </head>
 <body>
@@ -123,7 +134,7 @@ const MobileNavDrawer = ({ open, onClose, go }) => {
       <div className="absolute inset-y-0 left-0 w-[88%] max-w-[380px] bg-white flex flex-col slide-up" style={{ animation: "slideUp 0.25s ease-out" }}>
         <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: RULE }}>
           <Logo className="h-9" />
-          <button onClick={onClose} className="w-9 h-9 flex items-center justify-center"><Icon name="x" size={20} /></button>
+          <button onClick={onClose} aria-label="Close" className="w-11 h-11 flex items-center justify-center"><Icon name="x" size={20} /></button>
         </div>
         <div className="p-5 border-b" style={{ borderColor: RULE }}>
           <div className="bg-stone-100 flex items-center">
@@ -187,9 +198,9 @@ const SiteHeader = ({ go, basketCount = 3 }) => {
 
         {/* Mobile header bar */}
         <div className="lg:hidden flex items-center justify-between px-4 py-3 gap-3">
-          <button onClick={() => setNavOpen(true)} className="w-10 h-10 -ml-2 flex items-center justify-center"><Icon name="menu" size={22} /></button>
-          <button onClick={() => go("home")} className="flex-1 flex justify-center"><Logo className="h-7" /></button>
-          <button onClick={() => go("basket")} className="w-10 h-10 -mr-2 flex items-center justify-center relative">
+          <button onClick={() => setNavOpen(true)} aria-label="Open menu" className="w-11 h-11 -ml-2 flex items-center justify-center"><Icon name="menu" size={22} /></button>
+          <button onClick={() => go("home")} aria-label="Direct Desk Solutions home" className="flex-1 flex justify-center"><Logo className="h-7" /></button>
+          <button onClick={() => go("basket")} aria-label={`Basket, ${basketCount} items`} className="w-11 h-11 -mr-2 flex items-center justify-center relative">
             <Icon name="shopping-bag" size={20} />
             {basketCount > 0 && <span style={{ background: BRAND_RED }} className="absolute top-1 right-1 text-white text-[10px] font-bold w-[16px] h-[16px] rounded-full flex items-center justify-center">{basketCount}</span>}
           </button>
@@ -302,12 +313,12 @@ const SiteFooter = () => (
 const ProductCard = ({ p, go }) => (
   <button onClick={() => go("product")} className="text-left group">
     <div className="aspect-square bg-white border relative overflow-hidden" style={{ borderColor: RULE }}>
-      <img src={p.img} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+      <img src={p.img} alt={p.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
       <div className="absolute top-2 left-2 lg:top-3 lg:left-3 flex flex-col gap-1">
         {p.condition === "used" && <Pill tone="red">Pre-Owned</Pill>}
         {p.was && <Pill tone="ink">Save {Math.round((1 - p.price / p.was) * 100)}%</Pill>}
       </div>
-      <button className="absolute top-2 right-2 lg:top-3 lg:right-3 w-8 h-8 lg:w-9 lg:h-9 bg-white/90 backdrop-blur flex items-center justify-center hover:bg-white">
+      <button aria-label="Save to wishlist" onClick={(e) => e.stopPropagation()} className="absolute top-2 right-2 lg:top-3 lg:right-3 w-9 h-9 lg:w-10 lg:h-10 bg-white/90 backdrop-blur flex items-center justify-center hover:bg-white">
         <Icon name="heart" size={14} />
       </button>
     </div>
@@ -364,7 +375,7 @@ const HomeScreen = ({ go }) => (
       <div className="lg:col-span-5 grid grid-cols-2 lg:grid-cols-1 lg:grid-rows-2 gap-3 lg:gap-6">
         <button onClick={() => go("new")} className="group relative overflow-hidden text-left bg-white border" style={{ borderColor: RULE }}>
           <div className="absolute inset-0">
-            <img src="https://images.unsplash.com/photo-1497366216548-37526070297c?w=900&h=600&fit=crop" className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-700" />
+            <img src="https://images.unsplash.com/photo-1497366216548-37526070297c?w=900&h=600&fit=crop" alt="Modern office workspace with new furniture" className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-700" />
             <div className="absolute inset-0" style={{ background: "linear-gradient(105deg, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.2) 70%)" }} />
           </div>
           <div className="relative p-4 lg:p-8 h-full flex flex-col justify-between text-white min-h-[200px] lg:min-h-[218px]">
@@ -384,7 +395,7 @@ const HomeScreen = ({ go }) => (
 
         <button onClick={() => go("used")} className="group relative overflow-hidden text-left border" style={{ borderColor: RULE, background: BRAND_RED }}>
           <div className="absolute inset-0 opacity-30">
-            <img src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=900&h=600&fit=crop" className="w-full h-full object-cover mix-blend-multiply group-hover:scale-105 transition-transform duration-700" />
+            <img src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=900&h=600&fit=crop" alt="Refurbished office furniture collection" className="w-full h-full object-cover mix-blend-multiply group-hover:scale-105 transition-transform duration-700" />
           </div>
           <div className="relative p-4 lg:p-8 h-full flex flex-col justify-between text-white min-h-[200px] lg:min-h-[218px]">
             <div>
@@ -445,7 +456,7 @@ const HomeScreen = ({ go }) => (
         ].map((c) => (
           <button key={c.n} className="group bg-white border text-left" style={{ borderColor: RULE }}>
             <div className="aspect-square overflow-hidden">
-              <img src={c.img} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+              <img src={c.img} alt={c.n} loading="lazy" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
             </div>
             <div className="p-2 lg:p-3 flex justify-between items-center">
               <span className="text-[12px] lg:text-[13px] font-bold">{c.n}</span>
@@ -531,7 +542,7 @@ const FilterDrawer = ({ open, onClose, isUsed }) => {
             <h3 className="text-lg font-black" style={{ fontFamily: "'Archivo Black', system-ui" }}>Filter</h3>
             <button className="text-[11px] underline">Clear all</button>
           </div>
-          <button onClick={onClose} className="w-9 h-9 flex items-center justify-center"><Icon name="x" size={20} /></button>
+          <button onClick={onClose} aria-label="Close" className="w-11 h-11 flex items-center justify-center"><Icon name="x" size={20} /></button>
         </div>
         <div className="flex-1 overflow-y-auto p-5 space-y-6">
           <div>
@@ -759,7 +770,7 @@ const ProductScreen = ({ go }) => {
               <div className="flex overflow-x-auto snap-x-mandatory hide-scrollbar">
                 {imgs.map((img, i) => (
                   <div key={i} className="snap-start shrink-0 w-full bg-white relative">
-                    <img src={img} className="w-full aspect-square object-cover" />
+                    <img src={img} alt={`Aeron Chair view ${i + 1}`} className="w-full aspect-square object-cover" />
                   </div>
                 ))}
               </div>
@@ -772,7 +783,7 @@ const ProductScreen = ({ go }) => {
                   <div key={i} className={`h-1.5 rounded-full transition-all ${i === 0 ? "w-6 bg-black" : "w-1.5 bg-black/40"}`} />
                 ))}
               </div>
-              <button className="absolute top-3 right-4 w-10 h-10 bg-white/90 backdrop-blur rounded-full flex items-center justify-center"><Icon name="heart" size={18} /></button>
+              <button aria-label="Save to wishlist" className="absolute top-3 right-4 w-11 h-11 bg-white/90 backdrop-blur rounded-full flex items-center justify-center"><Icon name="heart" size={18} /></button>
             </div>
           </div>
           {/* Desktop gallery */}
@@ -780,13 +791,13 @@ const ProductScreen = ({ go }) => {
             <div className="flex flex-col gap-3 w-20 shrink-0">
               {imgs.map((img, i) => (
                 <button key={i} onClick={() => setImgIdx(i)} className={`aspect-square border-2 ${imgIdx === i ? "border-black" : "border-transparent"}`}>
-                  <img src={img} className="w-full h-full object-cover" />
+                  <img src={img} alt={`Aeron Chair thumbnail ${i + 1}`} className="w-full h-full object-cover" />
                 </button>
               ))}
               <button className="aspect-square border flex flex-col items-center justify-center text-[10px] text-stone-500" style={{ borderColor: RULE }}>+8<br />more</button>
             </div>
             <div className="flex-1 bg-white border relative" style={{ borderColor: RULE }}>
-              <img src={imgs[imgIdx]} className="w-full aspect-square object-cover" />
+              <img src={imgs[imgIdx]} alt="Aeron Chair — Size B Graphite" className="w-full aspect-square object-cover" />
               <div className="absolute top-4 left-4 flex flex-col gap-2">
                 <Pill tone="red">Pre-Owned · Grade A</Pill>
                 <Pill tone="ink">Save 63%</Pill>
@@ -842,9 +853,9 @@ const ProductScreen = ({ go }) => {
             <div className="text-[12px] font-bold tracking-wider uppercase mb-2">Quantity · 3 in stock</div>
             <div className="flex items-stretch gap-3">
               <div className="flex border" style={{ borderColor: INK }}>
-                <button onClick={() => setQty(Math.max(1, qty - 1))} className="w-12 hover:bg-black hover:text-white"><Icon name="minus" size={14} className="mx-auto" /></button>
-                <div className="w-14 text-center self-center font-bold">{qty}</div>
-                <button onClick={() => setQty(qty + 1)} className="w-12 hover:bg-black hover:text-white"><Icon name="plus" size={14} className="mx-auto" /></button>
+                <button onClick={() => setQty(Math.max(1, qty - 1))} aria-label="Decrease quantity" className="w-12 hover:bg-black hover:text-white"><Icon name="minus" size={14} className="mx-auto" /></button>
+                <div className="w-14 text-center self-center font-bold" aria-live="polite">{qty}</div>
+                <button onClick={() => setQty(qty + 1)} aria-label="Increase quantity" className="w-12 hover:bg-black hover:text-white"><Icon name="plus" size={14} className="mx-auto" /></button>
               </div>
               <button onClick={() => go("basket")} className="flex-1 text-white font-bold tracking-[0.14em] uppercase text-[13px] flex items-center justify-center gap-2 hover:opacity-90" style={{ background: INK }}>
                 <Icon name="shopping-bag" size={15} /> Add to Basket — {fmt(485 * qty)}
@@ -928,9 +939,9 @@ const ProductScreen = ({ go }) => {
       {/* MOBILE STICKY ADD-TO-BASKET BAR */}
       <div className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t p-3 flex items-center gap-2" style={{ borderColor: RULE, paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)" }}>
         <div className="flex border shrink-0" style={{ borderColor: INK }}>
-          <button onClick={() => setQty(Math.max(1, qty - 1))} className="w-9 h-11"><Icon name="minus" size={14} className="mx-auto" /></button>
-          <div className="w-9 text-center self-center font-bold text-[14px]">{qty}</div>
-          <button onClick={() => setQty(qty + 1)} className="w-9 h-11"><Icon name="plus" size={14} className="mx-auto" /></button>
+          <button onClick={() => setQty(Math.max(1, qty - 1))} aria-label="Decrease quantity" className="w-11 h-11"><Icon name="minus" size={14} className="mx-auto" /></button>
+          <div className="w-9 text-center self-center font-bold text-[14px]" aria-live="polite">{qty}</div>
+          <button onClick={() => setQty(qty + 1)} aria-label="Increase quantity" className="w-11 h-11"><Icon name="plus" size={14} className="mx-auto" /></button>
         </div>
         <button onClick={() => go("basket")} className="flex-1 h-11 text-white font-bold tracking-[0.12em] uppercase text-[12px] flex items-center justify-center gap-2" style={{ background: INK }}>
           Add — {fmt(485 * qty)}
@@ -987,16 +998,16 @@ const BasketScreen = ({ go }) => {
             <div className="lg:hidden space-y-3">
               {items.map((it, idx) => (
                 <div key={idx} className="bg-white border p-3 flex gap-3" style={{ borderColor: RULE }}>
-                  <img src={it.img} className="w-24 h-24 object-cover shrink-0" />
+                  <img src={it.img} alt={it.name} loading="lazy" className="w-24 h-24 object-cover shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="text-[13px] font-bold leading-tight line-clamp-2">{it.name}</div>
                     <div className="text-[11px] text-stone-500 mt-0.5 line-clamp-1">{it.sub}</div>
                     {it.condition === "used" && <div className="mt-1.5"><Pill tone="red">Pre-Owned</Pill></div>}
                     <div className="flex items-center justify-between mt-2.5">
                       <div className="flex border" style={{ borderColor: INK }}>
-                        <button className="w-8 h-8"><Icon name="minus" size={12} className="mx-auto" /></button>
+                        <button aria-label="Decrease quantity" className="w-10 h-10"><Icon name="minus" size={12} className="mx-auto" /></button>
                         <div className="w-8 text-center self-center font-bold text-[12px]">{it.qty}</div>
-                        <button className="w-8 h-8"><Icon name="plus" size={12} className="mx-auto" /></button>
+                        <button aria-label="Increase quantity" className="w-10 h-10"><Icon name="plus" size={12} className="mx-auto" /></button>
                       </div>
                       <div className="text-right">
                         <div className="font-bold text-[14px]">{fmt(it.price * it.qty)}</div>
@@ -1022,7 +1033,7 @@ const BasketScreen = ({ go }) => {
               {items.map((it, idx) => (
                 <div key={idx} className="grid grid-cols-12 gap-4 px-6 py-5 border-b items-center" style={{ borderColor: RULE }}>
                   <div className="col-span-6 flex gap-4 items-center">
-                    <img src={it.img} className="w-20 h-20 object-cover border" style={{ borderColor: RULE }} />
+                    <img src={it.img} alt={it.name} loading="lazy" className="w-20 h-20 object-cover border" style={{ borderColor: RULE }} />
                     <div>
                       <div className="text-[14px] font-bold leading-tight">{it.name}</div>
                       <div className="text-[12px] text-stone-500 mt-0.5">{it.sub}</div>
@@ -1035,9 +1046,9 @@ const BasketScreen = ({ go }) => {
                   </div>
                   <div className="col-span-2 flex justify-center">
                     <div className="flex border" style={{ borderColor: INK }}>
-                      <button className="w-8 h-8"><Icon name="minus" size={12} className="mx-auto" /></button>
+                      <button aria-label="Decrease quantity" className="w-9 h-9"><Icon name="minus" size={12} className="mx-auto" /></button>
                       <div className="w-10 text-center self-center font-bold text-[13px]">{it.qty}</div>
-                      <button className="w-8 h-8"><Icon name="plus" size={12} className="mx-auto" /></button>
+                      <button aria-label="Increase quantity" className="w-9 h-9"><Icon name="plus" size={12} className="mx-auto" /></button>
                     </div>
                   </div>
                   <div className="col-span-2 text-right text-[13px]">{fmt(it.price)}</div>
@@ -1146,7 +1157,7 @@ const CheckoutScreen = ({ go }) => {
           {[PRODUCTS[1], PRODUCTS[0], PRODUCTS[5]].map((p, i) => (
             <div key={i} className="flex gap-3 text-[12px]">
               <div className="relative shrink-0">
-                <img src={p.img} className="w-14 h-14 object-cover" />
+                <img src={p.img} alt={p.name} loading="lazy" className="w-14 h-14 object-cover" />
                 <span className="absolute -top-1.5 -right-1.5 bg-black text-white w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center">{[2, 1, 4][i]}</span>
               </div>
               <div className="flex-1 min-w-0">
@@ -1168,8 +1179,8 @@ const CheckoutScreen = ({ go }) => {
         <div className="lg:col-span-8 space-y-4 lg:space-y-6">
           {/* Express checkout — mobile */}
           <div className="lg:hidden grid grid-cols-2 gap-3">
-            <button className="h-12 bg-black text-white text-[13px] font-bold rounded">  Pay</button>
-            <button className="h-12 bg-[#5A31F4] text-white text-[13px] font-bold rounded">Klarna</button>
+            <button aria-label="Pay with Apple Pay" className="h-12 bg-black text-white text-[13px] font-bold rounded flex items-center justify-center gap-1"><span aria-hidden="true">{""}</span> Pay</button>
+            <button aria-label="Pay with Klarna" className="h-12 bg-[#FFA8CD] text-black text-[13px] font-bold rounded">Klarna</button>
           </div>
           <div className="lg:hidden flex items-center gap-3 text-[11px] text-stone-500">
             <span className="flex-1 h-px bg-stone-200" /> OR PAY BY CARD <span className="flex-1 h-px bg-stone-200" />
@@ -1182,12 +1193,12 @@ const CheckoutScreen = ({ go }) => {
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div>
-                <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold">Email</label>
-                <input className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" defaultValue="sarah@studiowest.co.uk" style={{ borderColor: INK }} />
+                <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold" htmlFor="co-email">Email</label>
+                <input id="co-email" type="email" autoComplete="email" inputMode="email" className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" defaultValue="sarah@studiowest.co.uk" style={{ borderColor: INK }} />
               </div>
               <div>
-                <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold">Phone</label>
-                <input type="tel" className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" defaultValue="+44 7700 900123" style={{ borderColor: RULE }} />
+                <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold" htmlFor="co-phone">Phone</label>
+                <input id="co-phone" type="tel" autoComplete="tel" className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" defaultValue="+44 7700 900123" style={{ borderColor: RULE }} />
               </div>
             </div>
           </section>
@@ -1196,31 +1207,31 @@ const CheckoutScreen = ({ go }) => {
             <h2 className="text-base lg:text-xl font-black mb-4 lg:mb-5" style={{ fontFamily: "'Archivo Black', system-ui" }}>02 — Delivery</h2>
             <div className="grid grid-cols-2 gap-3 lg:gap-4">
               <div>
-                <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold">First Name</label>
-                <input className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" defaultValue="Sarah" style={{ borderColor: RULE }} />
+                <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold" htmlFor="co-fname">First Name</label>
+                <input id="co-fname" autoComplete="given-name" className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" defaultValue="Sarah" style={{ borderColor: RULE }} />
               </div>
               <div>
-                <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold">Last Name</label>
-                <input className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" defaultValue="Mahmood" style={{ borderColor: RULE }} />
+                <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold" htmlFor="co-lname">Last Name</label>
+                <input id="co-lname" autoComplete="family-name" className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" defaultValue="Mahmood" style={{ borderColor: RULE }} />
               </div>
               <div className="col-span-2">
-                <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold">Company (optional)</label>
-                <input className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" defaultValue="Studio West" style={{ borderColor: RULE }} />
+                <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold" htmlFor="co-company">Company (optional)</label>
+                <input id="co-company" autoComplete="organization" className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" defaultValue="Studio West" style={{ borderColor: RULE }} />
               </div>
               <div className="col-span-2">
-                <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold">Postcode</label>
+                <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold" htmlFor="co-postcode">Postcode</label>
                 <div className="flex gap-2">
-                  <input className="flex-1 border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" defaultValue="E2 8LR" style={{ borderColor: RULE }} />
+                  <input id="co-postcode" autoComplete="postal-code" className="flex-1 border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px] uppercase" defaultValue="E2 8LR" style={{ borderColor: RULE }} />
                   <button className="text-[11px] font-bold tracking-wider uppercase border-b-2 px-3 mt-1" style={{ borderColor: INK }}>Find →</button>
                 </div>
               </div>
               <div className="col-span-2">
-                <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold">Address</label>
-                <input className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" defaultValue="14 Granby Street" style={{ borderColor: RULE }} />
+                <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold" htmlFor="co-address">Address</label>
+                <input id="co-address" autoComplete="street-address" className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" defaultValue="14 Granby Street" style={{ borderColor: RULE }} />
               </div>
               <div className="col-span-2">
-                <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold">City</label>
-                <input className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" defaultValue="London" style={{ borderColor: RULE }} />
+                <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold" htmlFor="co-city">City</label>
+                <input id="co-city" autoComplete="address-level2" className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" defaultValue="London" style={{ borderColor: RULE }} />
               </div>
             </div>
 
@@ -1254,30 +1265,26 @@ const CheckoutScreen = ({ go }) => {
             </div>
             <div className="space-y-4">
               <div>
-                <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold">Card number</label>
-                <input inputMode="numeric" className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black tracking-wider text-[14px]" placeholder="1234  5678  9012  3456" style={{ borderColor: RULE }} />
+                <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold" htmlFor="co-card">Card number</label>
+                <input id="co-card" inputMode="numeric" autoComplete="cc-number" className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black tracking-wider text-[14px]" placeholder="1234  5678  9012  3456" style={{ borderColor: RULE }} />
               </div>
               <div className="grid grid-cols-3 gap-3 lg:gap-4">
                 <div>
-                  <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold">Expiry</label>
-                  <input inputMode="numeric" className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" placeholder="MM/YY" style={{ borderColor: RULE }} />
+                  <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold" htmlFor="co-exp">Expiry</label>
+                  <input id="co-exp" inputMode="numeric" autoComplete="cc-exp" className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" placeholder="MM/YY" style={{ borderColor: RULE }} />
                 </div>
                 <div>
-                  <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold">CVC</label>
-                  <input inputMode="numeric" className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" placeholder="000" style={{ borderColor: RULE }} />
+                  <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold" htmlFor="co-cvc">CVC</label>
+                  <input id="co-cvc" inputMode="numeric" autoComplete="cc-csc" className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" placeholder="000" style={{ borderColor: RULE }} />
                 </div>
                 <div>
-                  <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold">Postcode</label>
-                  <input className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px]" placeholder="SW1A" style={{ borderColor: RULE }} />
+                  <label className="text-[10px] lg:text-[11px] tracking-wider uppercase font-bold" htmlFor="co-billing-postcode">Postcode</label>
+                  <input id="co-billing-postcode" autoComplete="billing postal-code" className="w-full border-b-2 py-2.5 mt-1 bg-transparent focus:outline-none focus:border-black text-[14px] uppercase" placeholder="SW1A" style={{ borderColor: RULE }} />
                 </div>
               </div>
             </div>
           </section>
 
-          {/* Mobile place-order — sticky bottom */}
-          <button className="hidden lg:flex w-full py-4 text-white text-[13px] font-bold tracking-[0.16em] uppercase items-center justify-center gap-2" style={{ background: BRAND_RED }}>
-            Place Order — £2,426.30 <Icon name="arrow-right" size={15} />
-          </button>
         </div>
 
         {/* Desktop summary */}
@@ -1288,7 +1295,7 @@ const CheckoutScreen = ({ go }) => {
               {[PRODUCTS[1], PRODUCTS[0], PRODUCTS[5]].map((p, i) => (
                 <div key={i} className="flex gap-3 text-[12px]">
                   <div className="relative">
-                    <img src={p.img} className="w-14 h-14 object-cover" />
+                    <img src={p.img} alt={p.name} loading="lazy" className="w-14 h-14 object-cover" />
                     <span className="absolute -top-1 -right-1 bg-white text-black w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center">{[2, 1, 4][i]}</span>
                   </div>
                   <div className="flex-1">
@@ -1346,7 +1353,7 @@ const CRMSidebar = ({ activePage = "products", onNav, mobileOpen, onCloseMobile 
           <Logo className="h-7 lg:h-8 brightness-0 invert" />
           <div className="text-[10px] tracking-[0.22em] uppercase mt-1.5 lg:mt-2" style={{ color: BRAND_RED }}>Admin Console</div>
         </div>
-        {mobileOpen && <button onClick={onCloseMobile} className="lg:hidden w-9 h-9 flex items-center justify-center"><Icon name="x" size={20} /></button>}
+        {mobileOpen && <button onClick={onCloseMobile} aria-label="Close admin menu" className="lg:hidden w-11 h-11 flex items-center justify-center"><Icon name="x" size={20} /></button>}
       </div>
       <nav className="flex-1 py-4 overflow-y-auto">
         {items.map((x) => (
@@ -1398,7 +1405,7 @@ const CRMScreen = ({ go }) => {
         <div className="bg-white border-b sticky top-0 z-30" style={{ borderColor: RULE }}>
           <div className="flex items-center justify-between px-4 lg:px-8 py-3 lg:py-4 gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <button onClick={() => setNavOpen(true)} className="lg:hidden w-10 h-10 -ml-2 flex items-center justify-center"><Icon name="menu" size={20} /></button>
+              <button onClick={() => setNavOpen(true)} aria-label="Open admin menu" className="lg:hidden w-11 h-11 -ml-2 flex items-center justify-center"><Icon name="menu" size={20} /></button>
               <div className="min-w-0">
                 <div className="text-[10px] lg:text-[11px] tracking-wider uppercase text-stone-500">Catalogue</div>
                 <h1 className="text-lg lg:text-2xl font-black mt-0.5 truncate" style={{ fontFamily: "'Archivo Black', system-ui" }}>Product Manager</h1>
@@ -1463,7 +1470,7 @@ const CRMScreen = ({ go }) => {
           {CRM_PRODUCTS.map((p, i) => (
             <button key={i} onClick={() => go("crm-upload")} className="w-full bg-white border p-3 flex gap-3 text-left" style={{ borderColor: RULE }}>
               <div className="w-16 h-16 bg-stone-100 border relative shrink-0" style={{ borderColor: RULE }}>
-                <img src={PRODUCTS[i % PRODUCTS.length].img} className="w-full h-full object-cover" />
+                <img src={PRODUCTS[i % PRODUCTS.length].img} alt={p.name} loading="lazy" className="w-full h-full object-cover" />
                 <span className="absolute -bottom-1 -right-1 bg-black text-white text-[9px] px-1 rounded-full">+{p.images}</span>
               </div>
               <div className="flex-1 min-w-0">
@@ -1500,7 +1507,7 @@ const CRMScreen = ({ go }) => {
               <div><input type="checkbox" /></div>
               <div>
                 <div className="w-12 h-12 bg-stone-100 border relative" style={{ borderColor: RULE }}>
-                  <img src={PRODUCTS[i % PRODUCTS.length].img} className="w-full h-full object-cover" />
+                  <img src={PRODUCTS[i % PRODUCTS.length].img} alt={p.name} loading="lazy" className="w-full h-full object-cover" />
                   <span className="absolute -bottom-1 -right-1 bg-black text-white text-[9px] px-1 rounded-full">+{p.images}</span>
                 </div>
               </div>
@@ -1516,8 +1523,8 @@ const CRMScreen = ({ go }) => {
               <div><Pill tone={p.status === "Live" ? "green" : "amber"}>{p.status}</Pill></div>
               <div className="text-[11px] text-stone-500">{p.updated}</div>
               <div className="flex justify-end gap-1">
-                <button onClick={() => go("crm-upload")} className="p-1.5 hover:bg-stone-200"><Icon name="edit-3" size={13} /></button>
-                <button className="p-1.5 hover:bg-stone-200"><Icon name="more-horizontal" size={13} /></button>
+                <button onClick={() => go("crm-upload")} aria-label={`Edit ${p.name}`} className="p-2 hover:bg-stone-200"><Icon name="edit-3" size={13} /></button>
+                <button aria-label={`More actions for ${p.name}`} className="p-2 hover:bg-stone-200"><Icon name="more-horizontal" size={13} /></button>
               </div>
             </div>
           ))}
@@ -1540,7 +1547,7 @@ const CRMUploadScreen = ({ go }) => {
         <div className="bg-white border-b sticky top-0 z-30" style={{ borderColor: RULE }}>
           <div className="flex items-center justify-between px-4 lg:px-8 py-3 lg:py-4 gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <button onClick={() => setNavOpen(true)} className="lg:hidden w-10 h-10 -ml-2 flex items-center justify-center"><Icon name="menu" size={20} /></button>
+              <button onClick={() => setNavOpen(true)} aria-label="Open admin menu" className="lg:hidden w-11 h-11 -ml-2 flex items-center justify-center"><Icon name="menu" size={20} /></button>
               <button onClick={() => go("crm")} className="hidden lg:block text-[11px] tracking-wider uppercase text-stone-500 hover:underline">← Back</button>
               <button onClick={() => go("crm")} className="lg:hidden w-9 h-9 -ml-2 flex items-center justify-center"><Icon name="chevron-left" size={20} /></button>
               <div className="min-w-0">
@@ -1619,7 +1626,7 @@ const CRMUploadScreen = ({ go }) => {
                     { i: PRODUCTS[6].img, status: "Uploading", progress: 64 },
                   ].map((img, i) => (
                     <div key={i} className="relative group aspect-square bg-stone-100 border" style={{ borderColor: RULE }}>
-                      <img src={img.i} className="w-full h-full object-cover" />
+                      <img src={img.i} alt={`Upload ${i + 1} — ${img.status}`} loading="lazy" className="w-full h-full object-cover" />
                       {img.hero && <div className="absolute top-1 left-1 bg-black text-white text-[9px] font-bold tracking-wider uppercase px-1.5 py-0.5">Hero</div>}
                       {img.progress && (
                         <div className="absolute inset-0 bg-black/50 flex flex-col items-end justify-end p-1.5">
