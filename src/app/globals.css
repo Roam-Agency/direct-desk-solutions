@@ -1,26 +1,28 @@
 @import "tailwindcss";
 
+/* Direct Desk Solutions — base styles
+   Brand palette and typography choices will be expanded here later. */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --brand-red: #E5202A;
+  --ink: #0A0A0A;
+  --paper: #FAFAF7;
+  --rule: #E8E4DC;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-brand-red: var(--brand-red);
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+  --color-rule: var(--rule);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
 }
