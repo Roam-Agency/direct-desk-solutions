@@ -1,7 +1,29 @@
 "use client";
 
 import { useCallback, useRef, useState, useTransition } from "react";
-import { generateUploadSignature, attachImage, deleteImage, setHeroImage, updateImageAltText } from "./_actions";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  rectSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
+  generateUploadSignature,
+  attachImage,
+  deleteImage,
+  setHeroImage,
+  updateImageAltText,
+  reorderImages,
+} from "./_actions";
 
 /**
  * Image uploader for the product form.
@@ -64,6 +86,110 @@ function validateFile(file: File): string | null {
     return `Too large (${mb}MB) — max 15MB`;
   }
   return null;
+}
+
+// One sortable thumbnail. Has to be its own component because each item
+// calls useSortable, and hooks can't run inside a .map() body.
+function SortableThumbnail({
+  img,
+  isDeleting,
+  isSettingHero,
+  onDelete,
+  onSetHero,
+  onAltTextBlur,
+}: {
+  img: AttachedImage;
+  isDeleting: boolean;
+  isSettingHero: boolean;
+  onDelete: (id: string) => void;
+  onSetHero: (id: string) => void;
+  onAltTextBlur: (
+    id: string,
+    e: React.FocusEvent<HTMLInputElement>
+  ) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: img.id });
+
+  // dnd-kit provides transform + transition values that we apply via
+  // inline style. The CSS helper serialises the transform object to a
+  // valid CSS string. While dragging we lift the z-index so the dragged
+  // thumbnail floats above the others.
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : undefined,
+    opacity: isDragging ? 0.6 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="space-y-2">
+      <div
+        {...attributes}
+        {...listeners}
+        className={`group relative aspect-square cursor-grab border border-rule bg-paper transition active:cursor-grabbing ${
+          isDeleting ? "opacity-40" : ""
+        }`}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={img.cloudinary_url}
+          alt={img.alt_text || ""}
+          className="h-full w-full object-cover"
+          draggable={false}
+        />
+        {img.is_hero && (
+          <span className="absolute left-2 top-2 bg-brand-red px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-paper">
+            Hero
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(img.id);
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          disabled={isDeleting}
+          className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center bg-ink/80 text-paper opacity-0 transition group-hover:opacity-100 hover:bg-brand-red disabled:cursor-wait disabled:opacity-50"
+          aria-label={`Delete image ${img.alt_text || ""}`.trim()}
+        >
+          <span aria-hidden="true" className="text-base leading-none">
+            ×
+          </span>
+        </button>
+        {!img.is_hero && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSetHero(img.id);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            disabled={isSettingHero}
+            className="absolute inset-x-0 bottom-0 bg-ink/80 px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest text-paper opacity-0 transition group-hover:opacity-100 hover:bg-brand-red disabled:cursor-wait disabled:opacity-50"
+          >
+            {isSettingHero ? "Setting…" : "Make hero"}
+          </button>
+        )}
+      </div>
+      <input
+        type="text"
+        defaultValue={img.alt_text}
+        onBlur={(e) => onAltTextBlur(img.id, e)}
+        onPointerDown={(e) => e.stopPropagation()}
+        placeholder="Alt text…"
+        className="w-full border border-rule bg-paper px-2 py-1 text-xs text-ink placeholder:text-ink/30 focus:border-ink focus:outline-none"
+        aria-label={`Alt text for image ${img.cloudinary_public_id}`}
+      />
+    </div>
+  );
 }
 
 export function ImageUploader({
@@ -425,6 +551,48 @@ export function ImageUploader({
     );
   };
 
+  // Drag-and-drop sensors. The 8px activation distance is critical: without
+  // it, every click on a thumbnail's child controls (delete X, MAKE HERO bar)
+  // would be interpreted as the start of a drag and the click handler would
+  // never fire. 8px is enough to make accidental drags very rare while still
+  // feeling responsive when a real drag starts.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  );
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = images.findIndex((i) => i.id === active.id);
+    const newIndex = images.findIndex((i) => i.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    // Snapshot for revert.
+    const previous = images;
+    const reordered = arrayMove(images, oldIndex, newIndex);
+
+    // Optimistic UI: show the new order immediately.
+    startTransition(() => {
+      setImages(reordered);
+    });
+
+    // Persist. Dense sort_orders 0..N-1 in the new visual order.
+    const updates = reordered.map((img, idx) => ({
+      id: img.id,
+      sort_order: idx,
+    }));
+    const result = await reorderImages(productId, updates);
+
+    if (!result.ok) {
+      // Revert to the pre-drag order.
+      startTransition(() => {
+        setImages(previous);
+      });
+      window.alert(`Could not save order: ${result.formError}`);
+    }
+  };
+
   return (
     <div>
       <div
@@ -531,65 +699,41 @@ export function ImageUploader({
       )}
 
       {images.length > 0 && (
-        <div className="mt-8">
+        <div className="mt-8" suppressHydrationWarning>
           <p className="text-xs font-bold uppercase tracking-widest text-ink/60">
-            Attached ({images.length})
+            Attached ({images.length}) — drag to reorder
           </p>
-          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-            {images.map((img) => {
-              const isDeleting = deletingIds.has(img.id);
-              return (
-                <div key={img.id} className="space-y-2">
-                  <div
-                    className={`group relative aspect-square border border-rule bg-paper transition ${
-                      isDeleting ? "opacity-40" : ""
-                    }`}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={img.cloudinary_url}
-                      alt={img.alt_text || ""}
-                      className="h-full w-full object-cover"
-                    />
-                    {img.is_hero && (
-                      <span className="absolute left-2 top-2 bg-brand-red px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-paper">
-                        Hero
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(img.id)}
-                      disabled={isDeleting}
-                      className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center bg-ink/80 text-paper opacity-0 transition group-hover:opacity-100 hover:bg-brand-red disabled:cursor-wait disabled:opacity-50"
-                      aria-label={`Delete image ${img.alt_text || ""}`.trim()}
-                    >
-                      <span aria-hidden="true" className="text-base leading-none">
-                        ×
-                      </span>
-                    </button>
-                    {!img.is_hero && (
-                      <button
-                        type="button"
-                        onClick={() => handleSetHero(img.id)}
-                        disabled={settingHeroIds.has(img.id)}
-                        className="absolute inset-x-0 bottom-0 bg-ink/80 px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest text-paper opacity-0 transition group-hover:opacity-100 hover:bg-brand-red disabled:cursor-wait disabled:opacity-50"
-                      >
-                        {settingHeroIds.has(img.id) ? "Setting…" : "Make hero"}
-                      </button>
-                    )}
-                  </div>
-                  <input
-                    type="text"
-                    defaultValue={img.alt_text}
-                    onBlur={(e) => handleAltTextBlur(img.id, e)}
-                    placeholder="Alt text…"
-                    className="w-full border border-rule bg-paper px-2 py-1 text-xs text-ink placeholder:text-ink/30 focus:border-ink focus:outline-none"
-                    aria-label={`Alt text for image ${img.cloudinary_public_id}`}
+          {/* suppressHydrationWarning on the wrapper because dnd-kit's
+              auto-generated aria-describedby IDs (DndDescribedBy-N) start
+              from different counter values on server vs client. This is a
+              known dnd-kit + React 19 + Next App Router interaction. The
+              mismatch is cosmetic — dnd-kit re-syncs accessibility wiring
+              after hydration. We suppress here rather than chase the
+              upstream fix so the dev console stays clean for real warnings. */}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={images.map((i) => i.id)}
+              strategy={rectSortingStrategy}
+            >
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                {images.map((img) => (
+                  <SortableThumbnail
+                    key={img.id}
+                    img={img}
+                    isDeleting={deletingIds.has(img.id)}
+                    isSettingHero={settingHeroIds.has(img.id)}
+                    onDelete={handleDelete}
+                    onSetHero={handleSetHero}
+                    onAltTextBlur={handleAltTextBlur}
                   />
-                </div>
-              );
-            })}
-          </div>
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
         </div>
       )}
     </div>

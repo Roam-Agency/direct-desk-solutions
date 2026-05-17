@@ -525,3 +525,86 @@ export async function updateImageAltText(
   revalidatePath(`/admin/products/${image.product_id}`);
   return { ok: true, id: imageId };
 }
+
+
+// ----------------------------------------------------------------------------
+// Image management — reorder
+// ----------------------------------------------------------------------------
+// Apply a new ordering to a product's images. Receives an array of updates,
+// one per image, with the new sort_order integer.
+//
+// Implementation: sequential UPDATEs. Same single-admin reasoning as
+// setHeroImage — a partial-unique-index migration would close the
+// theoretical race, but it's not a real concern in this CRM. If any
+// update fails partway through, we surface the error; the table is left
+// in a partial state (some new orders, some old). The UI revert puts
+// the optimistic local state back, and the admin can drag again.
+//
+// We also belt-and-braces verify that every passed image actually belongs
+// to the same product. Stops a malicious caller from re-ordering images
+// across products (RLS would catch a fully cross-tenant attempt, but
+// a same-tenant scramble would slip past RLS).
+
+type ReorderImagesInput = Array<{ id: string; sort_order: number }>;
+
+type ReorderImagesResult =
+  | { ok: true }
+  | { ok: false; formError: string };
+
+export async function reorderImages(
+  productId: string,
+  updates: ReorderImagesInput
+): Promise<ReorderImagesResult> {
+  const supabase = await createClient();
+
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) {
+    return { ok: false, formError: "Not authenticated" };
+  }
+
+  if (updates.length === 0) {
+    return { ok: true };
+  }
+
+  // Verify every id belongs to this product. One round-trip.
+  const ids = updates.map((u) => u.id);
+  const { data: rows, error: verifyError } = await supabase
+    .from("product_images")
+    .select("id, product_id")
+    .in("id", ids);
+  if (verifyError) {
+    return { ok: false, formError: verifyError.message };
+  }
+  if (!rows || rows.length !== ids.length) {
+    return { ok: false, formError: "Some images not found" };
+  }
+  for (const row of rows) {
+    if (row.product_id !== productId) {
+      return {
+        ok: false,
+        formError: "An image does not belong to this product",
+      };
+    }
+  }
+
+  // Apply updates. One UPDATE per row. For products with many images
+  // (rare — typical is 4–10) this is N round-trips, but the alternative
+  // (a single UPSERT with all rows) would require sending the full row
+  // shape including immutable fields. Not worth the complexity yet.
+  for (const u of updates) {
+    const { error: updateError } = await supabase
+      .from("product_images")
+      .update({ sort_order: u.sort_order })
+      .eq("id", u.id);
+    if (updateError) {
+      return {
+        ok: false,
+        formError: `Failed to reorder: ${updateError.message}`,
+      };
+    }
+  }
+
+  revalidatePath("/admin/products");
+  revalidatePath(`/admin/products/${productId}`);
+  return { ok: true };
+}
