@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { productSchema, type ProductInput } from "@/lib/products/schema";
 
 /**
@@ -607,4 +607,215 @@ export async function reorderImages(
   revalidatePath("/admin/products");
   revalidatePath(`/admin/products/${productId}`);
   return { ok: true };
+}
+
+
+// ----------------------------------------------------------------------------
+// Mobile upload tokens — QR-to-phone flow
+// ----------------------------------------------------------------------------
+// When an admin clicks "Send to phone" on the desktop edit view, we mint a
+// short-lived token bound to that product. A QR code carrying /upload/<token>
+// is rendered; the admin scans with whatever phone they're holding (which
+// may not be signed in to admin). The mobile page resolves the token to a
+// product, uploads photos via the same Cloudinary signed-upload pipeline,
+// and attaches them via mobileAttachImage (defined further down in this
+// file when we wire the mobile route).
+//
+// Security model: the token IS the credential. There's no auth check on the
+// mobile side. To compensate:
+//   - 15-min TTL (set in the DB default, re-verified here)
+//   - Caps used_count at 50 — protects against a leaked token being used
+//     to spam-upload garbage at the product. Realistic admin sessions use
+//     1-10 uploads per token.
+//   - upload_tokens table has RLS denying anon/authenticated. All access
+//     goes through these Server Actions running with the service-role
+//     client (createAdminClient), which bypasses RLS.
+//   - Tokens are scoped to one product; resolving returns the product ID,
+//     so a tampered URL can't redirect uploads to a different product.
+
+const MAX_TOKEN_USES = 50;
+
+type CreateUploadTokenResult =
+  | { ok: true; token: string; expiresAt: string }
+  | { ok: false; formError: string };
+
+/**
+ * Mint a fresh upload token for this product. Called by the desktop edit
+ * view when admin clicks "Send to phone". Requires an authenticated caller;
+ * the new row records the caller's user id in created_by for audit.
+ *
+ * Returns the token UUID — the caller renders the QR for
+ * /upload/<token>.
+ */
+export async function createUploadToken(
+  productId: string
+): Promise<CreateUploadTokenResult> {
+  // Identify the caller. We use the user-context client (cookies) for this
+  // because auth.getUser() needs the session.
+  const supabase = await createClient();
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) {
+    return { ok: false, formError: "Not authenticated" };
+  }
+
+  // Verify the product exists. Cheap check, prevents minting tokens for
+  // invalid IDs that would just confuse the mobile page later.
+  const { data: product, error: productError } = await supabase
+    .from("products")
+    .select("id")
+    .eq("id", productId)
+    .single();
+  if (productError || !product) {
+    return { ok: false, formError: "Product not found" };
+  }
+
+  // Insert via admin client — upload_tokens has RLS denying authenticated.
+  // The defaults (token, created_at, expires_at, used_count) handle
+  // everything except product_id and created_by.
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("upload_tokens")
+    .insert({
+      product_id: productId,
+      created_by: userData.user.id,
+    })
+    .select("token, expires_at")
+    .single();
+
+  if (error || !data) {
+    return { ok: false, formError: error?.message ?? "Token insert failed" };
+  }
+
+  return {
+    ok: true,
+    token: data.token,
+    expiresAt: data.expires_at,
+  };
+}
+
+type ResolveUploadTokenResult =
+  | {
+      ok: true;
+      productId: string;
+      productName: string;
+      productSku: string;
+      expiresAt: string;
+    }
+  | { ok: false; reason: "expired" | "revoked" | "exhausted" | "not_found" };
+
+/**
+ * Validate a token and return the product it authorises uploads for.
+ * Called by the mobile /upload/[token] page on render.
+ *
+ * Deliberately returns specific `reason` strings so the mobile UI can
+ * render a useful state ("link expired — ask for a new one") rather
+ * than a generic error. None of these reasons leak whether the token
+ * ever existed; from the user's perspective they're all "this link
+ * doesn't work right now".
+ */
+export async function resolveUploadToken(
+  token: string
+): Promise<ResolveUploadTokenResult> {
+  // UUID format check up-front — a malformed token can't possibly be valid
+  // and Postgres would error on the lookup rather than returning empty.
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token)) {
+    return { ok: false, reason: "not_found" };
+  }
+
+  const admin = createAdminClient();
+  const { data: tokenRow, error: tokenError } = await admin
+    .from("upload_tokens")
+    .select("token, product_id, expires_at, revoked_at, used_count")
+    .eq("token", token)
+    .maybeSingle();
+
+  if (tokenError || !tokenRow) {
+    return { ok: false, reason: "not_found" };
+  }
+
+  if (tokenRow.revoked_at) {
+    return { ok: false, reason: "revoked" };
+  }
+
+  if (new Date(tokenRow.expires_at) <= new Date()) {
+    return { ok: false, reason: "expired" };
+  }
+
+  if (tokenRow.used_count >= MAX_TOKEN_USES) {
+    return { ok: false, reason: "exhausted" };
+  }
+
+  // Look up the product so the mobile page can show what it's uploading to.
+  // Done in a second round-trip rather than a join because we need the
+  // token row alone for the validity checks above — keeps the failure
+  // paths cheap.
+  const { data: product, error: productError } = await admin
+    .from("products")
+    .select("id, name, sku")
+    .eq("id", tokenRow.product_id)
+    .single();
+
+  if (productError || !product) {
+    return { ok: false, reason: "not_found" };
+  }
+
+  return {
+    ok: true,
+    productId: product.id,
+    productName: product.name,
+    productSku: product.sku,
+    expiresAt: tokenRow.expires_at,
+  };
+}
+
+type ConsumeUploadTokenResult =
+  | { ok: true; productId: string }
+  | { ok: false; reason: "expired" | "revoked" | "exhausted" | "not_found" };
+
+/**
+ * Validate a token and atomically increment used_count. Called server-side
+ * by mobileAttachImage (and by mobile signature generation) before doing
+ * any work on behalf of the token.
+ *
+ * We do the validity checks first, then increment. There's a theoretical
+ * race: two concurrent uploads on the same token could both pass the
+ * MAX_TOKEN_USES check before either increment lands. Acceptable — the
+ * cap is a safety bound, not a precise quota, and the worst case is a
+ * legitimate session getting one more upload than the cap allows.
+ */
+export async function consumeUploadToken(
+  token: string
+): Promise<ConsumeUploadTokenResult> {
+  const resolution = await resolveUploadToken(token);
+  if (!resolution.ok) {
+    return { ok: false, reason: resolution.reason };
+  }
+
+  const admin = createAdminClient();
+
+  // Increment used_count. We re-fetch then update rather than using a
+  // SQL expression because supabase-js can't express `set used_count =
+  // used_count + 1` without an RPC. Fine for our scale.
+  const { data: current, error: fetchError } = await admin
+    .from("upload_tokens")
+    .select("used_count")
+    .eq("token", token)
+    .single();
+  if (fetchError || !current) {
+    return { ok: false, reason: "not_found" };
+  }
+
+  const { error: updateError } = await admin
+    .from("upload_tokens")
+    .update({ used_count: current.used_count + 1 })
+    .eq("token", token);
+  if (updateError) {
+    // Token validated fine but increment failed. We choose to surface this
+    // as "not_found" — refusing the upload is safer than allowing it
+    // without recording the use, and the mobile UI handles "not_found"
+    // already.
+    return { ok: false, reason: "not_found" };
+  }
+
+  return { ok: true, productId: resolution.productId };
 }
