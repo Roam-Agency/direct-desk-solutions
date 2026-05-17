@@ -296,6 +296,11 @@ export function ImageUploader({
     };
   }, [productId]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Separate input for the camera-direct shortcut. We need a second element
+  // because the `capture` attribute lives on the input itself — toggling it
+  // on the same input would either always prompt the camera (annoying for
+  // desktop "browse files") or never prompt the camera (defeating the point).
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Drive the upload queue: whenever uploads state changes, kick off any
   // pending uploads up to the concurrency cap. Uses a ref to avoid stale
@@ -726,6 +731,14 @@ export function ImageUploader({
           >
             browse files
           </button>
+          ,{" "}
+          <button
+            type="button"
+            onClick={() => cameraInputRef.current?.click()}
+            className="font-bold text-brand-red underline underline-offset-2"
+          >
+            use camera
+          </button>
           {" "}or{" "}
           <button
             type="button"
@@ -741,6 +754,22 @@ export function ImageUploader({
           type="file"
           accept={ACCEPTED_MIME_TYPES.join(",")}
           multiple
+          className="hidden"
+          onChange={(e) => handleFiles(e.target.files)}
+        />
+        {/*
+          Camera-direct input. On mobile browsers the `capture` attribute
+          opens the rear camera; on desktop browsers without a camera, the
+          attribute is ignored and the user gets the regular file picker.
+          accept="image/*" instead of the strict ACCEPTED_MIME_TYPES list
+          because some mobile cameras deliver as application/octet-stream
+          and the MIME validation downstream in handleFiles is sufficient.
+        */}
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
         />
