@@ -16,15 +16,24 @@ export default async function EditProductPage({
 }: EditProductPageProps) {
   const { id } = await params;
   const supabase = await createClient();
-  const { data: product, error } = await supabase
-    .from("products")
-    .select("*")
-    .eq("id", id)
-    .single();
 
-  if (error || !product) {
+  // Two parallel fetches — the product itself and any already-attached
+  // images. We render the form regardless of whether images exist; only
+  // the product's existence gates the page.
+  const [productResult, imagesResult] = await Promise.all([
+    supabase.from("products").select("*").eq("id", id).single(),
+    supabase
+      .from("product_images")
+      .select("*")
+      .eq("product_id", id)
+      .order("sort_order", { ascending: true }),
+  ]);
+
+  if (productResult.error || !productResult.data) {
     notFound();
   }
+  const product = productResult.data;
+  const images = imagesResult.data ?? [];
 
   return (
     <div>
@@ -42,7 +51,7 @@ export default async function EditProductPage({
       </div>
 
       <div className="mt-10">
-        <ProductForm initialProduct={product} />
+        <ProductForm initialProduct={product} initialImages={images} />
       </div>
     </div>
   );
