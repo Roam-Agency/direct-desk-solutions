@@ -284,3 +284,111 @@ export async function attachImage(input: {
   return { ok: true, id: data.id };
 }
 
+
+
+// ----------------------------------------------------------------------------
+// Image management — delete
+// ----------------------------------------------------------------------------
+// Deleting an image is a two-step affair:
+//
+//   1. Tell Cloudinary to destroy the asset. If this fails we stop — leaving
+//      the DB row alone means the admin sees the image is still there and can
+//      retry. The opposite order (DB-first) would risk orphaning a Cloudinary
+//      asset with no DB reference, which we can't see or clean up from the app.
+//
+//   2. Delete the DB row. After this succeeds, check whether the deleted image
+//      was the hero — if so, promote the next image (by sort_order ASC) so the
+//      product always has a hero as long as any image exists.
+//
+// "Not found" from Cloudinary is treated as success. The asset is gone either
+// way, which is what the admin wanted.
+
+type DeleteImageResult =
+  | { ok: true; id: string }
+  | { ok: false; formError: string };
+
+export async function deleteImage(imageId: string): Promise<DeleteImageResult> {
+  const supabase = await createClient();
+
+  // Belt-and-braces auth check (middleware also gates this route).
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) {
+    return { ok: false, formError: "Not authenticated" };
+  }
+
+  // Look up the row so we know which Cloudinary asset to destroy and which
+  // product to potentially re-hero. Single round-trip.
+  const { data: image, error: lookupError } = await supabase
+    .from("product_images")
+    .select("id, product_id, cloudinary_public_id, is_hero")
+    .eq("id", imageId)
+    .single();
+  if (lookupError || !image) {
+    return { ok: false, formError: "Image not found" };
+  }
+
+  // Step 1 — Cloudinary destroy. Returns { result: 'ok' | 'not found' | ... }
+  // We accept 'ok' and 'not found'; anything else is a real failure.
+  try {
+    const destroyResult = await cloudinary.uploader.destroy(
+      image.cloudinary_public_id,
+      { invalidate: true }
+    );
+    const ok = destroyResult.result === "ok" || destroyResult.result === "not found";
+    if (!ok) {
+      return {
+        ok: false,
+        formError: `Cloudinary refused destroy: ${destroyResult.result}`,
+      };
+    }
+  } catch (err) {
+    return {
+      ok: false,
+      formError: err instanceof Error ? err.message : "Cloudinary destroy failed",
+    };
+  }
+
+  // Step 2 — DB delete
+  const { error: deleteError } = await supabase
+    .from("product_images")
+    .delete()
+    .eq("id", imageId);
+  if (deleteError) {
+    return { ok: false, formError: deleteError.message };
+  }
+
+  // Step 3 — if we just deleted the hero, promote the next image by sort_order.
+  // Skipped silently if no remaining images for this product.
+  if (image.is_hero) {
+    const { data: next, error: nextError } = await supabase
+      .from("product_images")
+      .select("id")
+      .eq("product_id", image.product_id)
+      .order("sort_order", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (nextError) {
+      // Image is gone; promotion failed. Surface this so admin knows.
+      return {
+        ok: false,
+        formError: `Image deleted but could not pick new hero: ${nextError.message}`,
+      };
+    }
+    if (next) {
+      const { error: promoteError } = await supabase
+        .from("product_images")
+        .update({ is_hero: true })
+        .eq("id", next.id);
+      if (promoteError) {
+        return {
+          ok: false,
+          formError: `Image deleted but could not promote new hero: ${promoteError.message}`,
+        };
+      }
+    }
+  }
+
+  revalidatePath("/admin/products");
+  revalidatePath(`/admin/products/${image.product_id}`);
+  return { ok: true, id: imageId };
+}
