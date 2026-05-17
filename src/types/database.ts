@@ -142,6 +142,44 @@ export type Database = {
         }
         Relationships: []
       }
+      upload_tokens: {
+        Row: {
+          created_at: string
+          created_by: string
+          expires_at: string
+          product_id: string
+          revoked_at: string | null
+          token: string
+          used_count: number
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          expires_at?: string
+          product_id: string
+          revoked_at?: string | null
+          token?: string
+          used_count?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          expires_at?: string
+          product_id?: string
+          revoked_at?: string | null
+          token?: string
+          used_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "upload_tokens_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
