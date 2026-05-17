@@ -11,13 +11,18 @@ import {
 } from "./_actions";
 import type { ProductInput } from "@/lib/products/schema";
 import { parseDisplayPriceToPence, formatPence } from "@/lib/products/format";
+import { ImageUploader } from "./_ImageUploader";
 import type { Database } from "@/types/database";
 
 type ProductRow = Database["public"]["Tables"]["products"]["Row"];
+type ProductImageRow =
+  Database["public"]["Tables"]["product_images"]["Row"];
 
 interface ProductFormProps {
   /** Present = edit mode, absent = create mode. */
   initialProduct?: ProductRow;
+  /** Already-attached images (edit mode only). Defaults to empty. */
+  initialImages?: ProductImageRow[];
 }
 
 /**
@@ -28,10 +33,15 @@ interface ProductFormProps {
  * on failure. The "Used item" fieldset is conditionally rendered based on
  * the condition radio; toggling clears used-only fields to keep data clean.
  *
- * Image upload is stubbed (next phase). A placeholder block reserves the
- * spot at the bottom of the form.
+ * In edit mode, an ImageUploader renders below the form fields, letting
+ * admins drag-drop or pick files which upload directly to Cloudinary and
+ * are persisted via the attachImage Server Action. In create mode the
+ * Images section is hidden — you can't attach to a product without an ID.
  */
-export default function ProductForm({ initialProduct }: ProductFormProps) {
+export default function ProductForm({
+  initialProduct,
+  initialImages = [],
+}: ProductFormProps) {
   const router = useRouter();
   const isEdit = Boolean(initialProduct);
   const [isPending, startTransition] = useTransition();
@@ -533,17 +543,17 @@ export default function ProductForm({ initialProduct }: ProductFormProps) {
         </Field>
       </Section>
 
-      <Section title="Images" subtitle="Coming in next phase">
-        <div className="border border-dashed border-rule bg-rule/20 px-6 py-12 text-center">
-          <p className="text-xs font-bold uppercase tracking-widest text-ink/40">
-            Image upload pipeline
-          </p>
-          <p className="mt-2 text-sm text-ink/60">
-            Cloudinary direct-upload, drag-to-reorder, hero designation, and
-            QR-to-phone capture land in the next sub-phase.
-          </p>
-        </div>
-      </Section>
+      {isEdit && initialProduct && (
+        <Section
+          title="Images"
+          subtitle="Drag-drop or browse to upload. Reorder + delete coming next session."
+        >
+          <ImageUploader
+            productId={initialProduct.id}
+            initialImages={initialImages}
+          />
+        </Section>
+      )}
 
       <div className="flex items-center justify-between border-t border-rule pt-8">
         <div className="flex gap-3">
