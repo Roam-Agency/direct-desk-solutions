@@ -24,6 +24,7 @@ import {
   updateImageAltText,
   reorderImages,
 } from "./_actions";
+import { SendToPhoneModal } from "./_SendToPhoneModal";
 
 /**
  * Image uploader for the product form.
@@ -194,9 +195,11 @@ function SortableThumbnail({
 
 export function ImageUploader({
   productId,
+  productName,
   initialImages,
 }: {
   productId: string;
+  productName: string;
   initialImages: AttachedImage[];
 }) {
   const [images, setImages] = useState<AttachedImage[]>(initialImages);
@@ -217,6 +220,7 @@ export function ImageUploader({
   // call for a given clientId does any work.
   const processedClientIdsRef = useRef<Set<string>>(new Set());
   const [, startTransition] = useTransition();
+  const [sendToPhoneOpen, setSendToPhoneOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Drive the upload queue: whenever uploads state changes, kick off any
@@ -648,6 +652,14 @@ export function ImageUploader({
           >
             browse files
           </button>
+          {" "}or{" "}
+          <button
+            type="button"
+            onClick={() => setSendToPhoneOpen(true)}
+            className="font-bold text-brand-red underline underline-offset-2"
+          >
+            send to phone
+          </button>
           . JPG, PNG, WebP, GIF, or HEIC up to 15MB each.
         </p>
         <input
@@ -749,7 +761,14 @@ export function ImageUploader({
           </DndContext>
         </div>
       )}
-    </div>
+    {sendToPhoneOpen && (
+      <SendToPhoneModal
+        productId={productId}
+        productName={productName}
+        onClose={() => setSendToPhoneOpen(false)}
+      />
+    )}
+  </div>
   );
 }
 
