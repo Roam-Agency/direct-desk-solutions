@@ -207,6 +207,15 @@ export function ImageUploader({
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   // Same shape for in-flight hero promotions.
   const [settingHeroIds, setSettingHeroIds] = useState<Set<string>>(new Set());
+  // Gatekeeper for processUpload: a Set of clientIds that have already
+  // entered processUpload. Lives in a ref (not state) so the check is
+  // synchronous and not subject to React's render scheduling. The earlier
+  // "duplicate uploads on every drop" bug was the render-body restart
+  // block re-calling processUpload for the same pending item multiple
+  // times before its first call had transitioned state away from
+  // "pending". This Set makes processUpload idempotent: only the first
+  // call for a given clientId does any work.
+  const processedClientIdsRef = useRef<Set<string>>(new Set());
   const [, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -228,6 +237,10 @@ export function ImageUploader({
 
   const processUpload = useCallback(
     async (item: UploadItem) => {
+      // Gatekeeper. See processedClientIdsRef declaration for the reasoning.
+      if (processedClientIdsRef.current.has(item.clientId)) return;
+      processedClientIdsRef.current.add(item.clientId);
+
       // Step 1: get signature
       updateUpload(item.clientId, { status: "uploading", progress: 5 });
       const sigResult = await generateUploadSignature(productId);
