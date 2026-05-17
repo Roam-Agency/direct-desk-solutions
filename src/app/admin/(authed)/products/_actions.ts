@@ -819,3 +819,154 @@ export async function consumeUploadToken(
 
   return { ok: true, productId: resolution.productId };
 }
+
+
+// ----------------------------------------------------------------------------
+// Mobile upload pipeline — token-authorised
+// ----------------------------------------------------------------------------
+// Counterparts to generateUploadSignature + attachImage that take an upload
+// token instead of relying on cookie-bound admin auth. The mobile /upload/[token]
+// page calls these on every photo it sends through.
+//
+// Both delegate to consumeUploadToken first, which re-validates the token and
+// records a use. consumeUploadToken returns the bound productId — neither
+// action accepts a productId from the client, so the token alone determines
+// which product receives the upload. A tampered URL cannot redirect uploads.
+//
+// Beyond the auth swap, the Cloudinary signature logic and the product_images
+// insert are intentionally identical to the desktop path. Same Cloudinary
+// preset, same folder layout, same hero/sort_order rules.
+
+type MobileSignatureResult =
+  | {
+      ok: true;
+      signature: string;
+      timestamp: number;
+      apiKey: string;
+      cloudName: string;
+      uploadPreset: string;
+      folder: string;
+    }
+  | {
+      ok: false;
+      reason: "expired" | "revoked" | "exhausted" | "not_found" | "server";
+    };
+
+/**
+ * Token-authorised counterpart of generateUploadSignature. Called from the
+ * mobile uploader for each photo.
+ *
+ * NB: signing a payload does NOT consume a use of the token — only the
+ * actual attach does. This means the mobile UI can pre-fetch a signature
+ * during file pick without burning a use if the user cancels.
+ */
+export async function mobileGenerateUploadSignature(
+  token: string
+): Promise<MobileSignatureResult> {
+  const resolution = await resolveUploadToken(token);
+  if (!resolution.ok) {
+    return { ok: false, reason: resolution.reason };
+  }
+
+  const timestamp = Math.floor(Date.now() / 1000);
+  const folder = `products/${resolution.productId}`;
+
+  const signature = cloudinary.utils.api_sign_request(
+    {
+      folder,
+      timestamp,
+      upload_preset: PRODUCT_IMAGE_UPLOAD_PRESET,
+    },
+    process.env.CLOUDINARY_API_SECRET as string
+  );
+
+  return {
+    ok: true,
+    signature,
+    timestamp,
+    apiKey: process.env.CLOUDINARY_API_KEY as string,
+    cloudName: CLOUDINARY_CLOUD_NAME,
+    uploadPreset: PRODUCT_IMAGE_UPLOAD_PRESET,
+    folder,
+  };
+}
+
+type MobileAttachImageResult =
+  | { ok: true; id: string }
+  | {
+      ok: false;
+      reason: "expired" | "revoked" | "exhausted" | "not_found" | "server";
+      formError?: string;
+    };
+
+/**
+ * Token-authorised counterpart of attachImage. Consumes a use of the
+ * token, then inserts a product_images row. Hero + sort_order logic
+ * is identical to the desktop attach: first image becomes hero,
+ * subsequent ones go to the end.
+ *
+ * We use the admin client for the insert because the mobile session
+ * is unauthenticated — the regular client would fail at RLS even
+ * though product_images allows authenticated INSERT, because the
+ * mobile page has no auth cookie.
+ */
+export async function mobileAttachImage(input: {
+  token: string;
+  publicId: string;
+  url: string;
+  altText?: string;
+}): Promise<MobileAttachImageResult> {
+  const consumed = await consumeUploadToken(input.token);
+  if (!consumed.ok) {
+    return { ok: false, reason: consumed.reason };
+  }
+
+  const admin = createAdminClient();
+
+  // Look at existing images for this product to decide hero + sort_order.
+  // Mirrors the desktop attach logic exactly.
+  const { data: existing, error: existingError } = await admin
+    .from("product_images")
+    .select("sort_order")
+    .eq("product_id", consumed.productId)
+    .order("sort_order", { ascending: false })
+    .limit(1);
+  if (existingError) {
+    return {
+      ok: false,
+      reason: "server",
+      formError: existingError.message,
+    };
+  }
+
+  const isFirst = !existing || existing.length === 0;
+  const nextSortOrder = isFirst ? 0 : (existing[0].sort_order ?? 0) + 1;
+
+  const { data, error } = await admin
+    .from("product_images")
+    .insert({
+      product_id: consumed.productId,
+      cloudinary_public_id: input.publicId,
+      cloudinary_url: input.url,
+      alt_text: input.altText ?? "",
+      is_hero: isFirst,
+      sort_order: nextSortOrder,
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    return {
+      ok: false,
+      reason: "server",
+      formError: error?.message ?? "Insert failed",
+    };
+  }
+
+  // Revalidate the desktop edit page so any open tab not subscribed to
+  // realtime still picks up the change on next navigation. Realtime is
+  // primary, this is the safety net.
+  revalidatePath("/admin/products");
+  revalidatePath(`/admin/products/${consumed.productId}`);
+  return { ok: true, id: data.id };
+}
