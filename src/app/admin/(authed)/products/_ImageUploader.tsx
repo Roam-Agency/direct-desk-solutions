@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState, useTransition } from "react";
-import { generateUploadSignature, attachImage } from "./_actions";
+import { generateUploadSignature, attachImage, deleteImage, setHeroImage } from "./_actions";
 
 /**
  * Image uploader for the product form.
@@ -76,6 +76,11 @@ export function ImageUploader({
   const [images, setImages] = useState<AttachedImage[]>(initialImages);
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  // Track in-flight deletes so the button disables + the thumbnail dims
+  // while Cloudinary destroys the asset. Set, not array, for O(1) membership.
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  // Same shape for in-flight hero promotions.
+  const [settingHeroIds, setSettingHeroIds] = useState<Set<string>>(new Set());
   const [, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -270,6 +275,123 @@ export function ImageUploader({
     setUploads((current) => current.filter((u) => u.clientId !== clientId));
   };
 
+  // Delete an attached image.
+  //
+  // Optimistic UI: we don't pre-remove the row, because if Cloudinary or the
+  // DB rejects the delete the admin should see why and the thumbnail should
+  // still be there. Instead we mark the id as "deleting" (dims + disables the
+  // button) and then commit the local state change once the Server Action
+  // returns success.
+  //
+  // Hero re-pick mirrors what deleteImage does on the server: if we deleted
+  // the current hero AND there's at least one image left, the next one by
+  // sort_order ASC becomes hero locally too. Keeps the UI consistent with
+  // the DB without a hard refresh.
+  const handleDelete = async (imageId: string) => {
+    const target = images.find((i) => i.id === imageId);
+    if (!target) return;
+
+    const confirmed = window.confirm(
+      target.is_hero
+        ? "Delete this hero image? The next image will be promoted to hero."
+        : "Delete this image?"
+    );
+    if (!confirmed) return;
+
+    setDeletingIds((current) => {
+      const next = new Set(current);
+      next.add(imageId);
+      return next;
+    });
+
+    const result = await deleteImage(imageId);
+
+    if (!result.ok) {
+      setDeletingIds((current) => {
+        const next = new Set(current);
+        next.delete(imageId);
+        return next;
+      });
+      window.alert(`Could not delete: ${result.formError}`);
+      return;
+    }
+
+    // Success — remove locally and re-pick hero if needed.
+    startTransition(() => {
+      setImages((current) => {
+        const remaining = current.filter((i) => i.id !== imageId);
+        if (target.is_hero && remaining.length > 0) {
+          const newHeroId = [...remaining].sort(
+            (a, b) => a.sort_order - b.sort_order
+          )[0].id;
+          return remaining.map((i) =>
+            i.id === newHeroId ? { ...i, is_hero: true } : i
+          );
+        }
+        return remaining;
+      });
+      setDeletingIds((current) => {
+        const next = new Set(current);
+        next.delete(imageId);
+        return next;
+      });
+    });
+  };
+
+  // Promote an image to hero. The previous hero (if any) becomes not-hero.
+  //
+  // Optimistic UI mirrors what setHeroImage does on the server: locally swap
+  // is_hero so the new target shows the badge and the previous hero loses it.
+  // On error, revert and alert.
+  const handleSetHero = async (imageId: string) => {
+    const target = images.find((i) => i.id === imageId);
+    if (!target || target.is_hero) return;
+
+    // Snapshot for revert. We only need the id of the previous hero.
+    const previousHero = images.find((i) => i.is_hero);
+
+    setSettingHeroIds((current) => {
+      const next = new Set(current);
+      next.add(imageId);
+      return next;
+    });
+
+    // Optimistic swap.
+    startTransition(() => {
+      setImages((current) =>
+        current.map((i) => {
+          if (i.id === imageId) return { ...i, is_hero: true };
+          if (i.is_hero) return { ...i, is_hero: false };
+          return i;
+        })
+      );
+    });
+
+    const result = await setHeroImage(imageId);
+
+    if (!result.ok) {
+      // Revert the optimistic swap.
+      startTransition(() => {
+        setImages((current) =>
+          current.map((i) => {
+            if (i.id === imageId) return { ...i, is_hero: false };
+            if (previousHero && i.id === previousHero.id) {
+              return { ...i, is_hero: true };
+            }
+            return i;
+          })
+        );
+      });
+      window.alert(`Could not set hero: ${result.formError}`);
+    }
+
+    setSettingHeroIds((current) => {
+      const next = new Set(current);
+      next.delete(imageId);
+      return next;
+    });
+  };
+
   return (
     <div>
       <div
@@ -381,24 +503,50 @@ export function ImageUploader({
             Attached ({images.length})
           </p>
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-            {images.map((img) => (
-              <div
-                key={img.id}
-                className="relative aspect-square border border-rule bg-paper"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={img.cloudinary_url}
-                  alt={img.alt_text || ""}
-                  className="h-full w-full object-cover"
-                />
-                {img.is_hero && (
-                  <span className="absolute left-2 top-2 bg-brand-red px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-paper">
-                    Hero
-                  </span>
-                )}
-              </div>
-            ))}
+            {images.map((img) => {
+              const isDeleting = deletingIds.has(img.id);
+              return (
+                <div
+                  key={img.id}
+                  className={`group relative aspect-square border border-rule bg-paper transition ${
+                    isDeleting ? "opacity-40" : ""
+                  }`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={img.cloudinary_url}
+                    alt={img.alt_text || ""}
+                    className="h-full w-full object-cover"
+                  />
+                  {img.is_hero && (
+                    <span className="absolute left-2 top-2 bg-brand-red px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-paper">
+                      Hero
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(img.id)}
+                    disabled={isDeleting}
+                    className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center bg-ink/80 text-paper opacity-0 transition group-hover:opacity-100 hover:bg-brand-red disabled:cursor-wait disabled:opacity-50"
+                    aria-label={`Delete image ${img.alt_text || ""}`.trim()}
+                  >
+                    <span aria-hidden="true" className="text-base leading-none">
+                      ×
+                    </span>
+                  </button>
+                  {!img.is_hero && (
+                    <button
+                      type="button"
+                      onClick={() => handleSetHero(img.id)}
+                      disabled={settingHeroIds.has(img.id)}
+                      className="absolute inset-x-0 bottom-0 bg-ink/80 px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest text-paper opacity-0 transition group-hover:opacity-100 hover:bg-brand-red disabled:cursor-wait disabled:opacity-50"
+                    >
+                      {settingHeroIds.has(img.id) ? "Setting…" : "Make hero"}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

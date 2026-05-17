@@ -284,3 +284,194 @@ export async function attachImage(input: {
   return { ok: true, id: data.id };
 }
 
+
+
+// ----------------------------------------------------------------------------
+// Image management — delete
+// ----------------------------------------------------------------------------
+// Deleting an image is a two-step affair:
+//
+//   1. Tell Cloudinary to destroy the asset. If this fails we stop — leaving
+//      the DB row alone means the admin sees the image is still there and can
+//      retry. The opposite order (DB-first) would risk orphaning a Cloudinary
+//      asset with no DB reference, which we can't see or clean up from the app.
+//
+//   2. Delete the DB row. After this succeeds, check whether the deleted image
+//      was the hero — if so, promote the next image (by sort_order ASC) so the
+//      product always has a hero as long as any image exists.
+//
+// "Not found" from Cloudinary is treated as success. The asset is gone either
+// way, which is what the admin wanted.
+
+type DeleteImageResult =
+  | { ok: true; id: string }
+  | { ok: false; formError: string };
+
+export async function deleteImage(imageId: string): Promise<DeleteImageResult> {
+  const supabase = await createClient();
+
+  // Belt-and-braces auth check (middleware also gates this route).
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) {
+    return { ok: false, formError: "Not authenticated" };
+  }
+
+  // Look up the row so we know which Cloudinary asset to destroy and which
+  // product to potentially re-hero. Single round-trip.
+  const { data: image, error: lookupError } = await supabase
+    .from("product_images")
+    .select("id, product_id, cloudinary_public_id, is_hero")
+    .eq("id", imageId)
+    .single();
+  if (lookupError || !image) {
+    return { ok: false, formError: "Image not found" };
+  }
+
+  // Step 1 — Cloudinary destroy. Returns { result: 'ok' | 'not found' | ... }
+  // We accept 'ok' and 'not found'; anything else is a real failure.
+  try {
+    const destroyResult = await cloudinary.uploader.destroy(
+      image.cloudinary_public_id,
+      { invalidate: true }
+    );
+    const ok = destroyResult.result === "ok" || destroyResult.result === "not found";
+    if (!ok) {
+      return {
+        ok: false,
+        formError: `Cloudinary refused destroy: ${destroyResult.result}`,
+      };
+    }
+  } catch (err) {
+    return {
+      ok: false,
+      formError: err instanceof Error ? err.message : "Cloudinary destroy failed",
+    };
+  }
+
+  // Step 2 — DB delete
+  const { error: deleteError } = await supabase
+    .from("product_images")
+    .delete()
+    .eq("id", imageId);
+  if (deleteError) {
+    return { ok: false, formError: deleteError.message };
+  }
+
+  // Step 3 — if we just deleted the hero, promote the next image by sort_order.
+  // Skipped silently if no remaining images for this product.
+  if (image.is_hero) {
+    const { data: next, error: nextError } = await supabase
+      .from("product_images")
+      .select("id")
+      .eq("product_id", image.product_id)
+      .order("sort_order", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (nextError) {
+      // Image is gone; promotion failed. Surface this so admin knows.
+      return {
+        ok: false,
+        formError: `Image deleted but could not pick new hero: ${nextError.message}`,
+      };
+    }
+    if (next) {
+      const { error: promoteError } = await supabase
+        .from("product_images")
+        .update({ is_hero: true })
+        .eq("id", next.id);
+      if (promoteError) {
+        return {
+          ok: false,
+          formError: `Image deleted but could not promote new hero: ${promoteError.message}`,
+        };
+      }
+    }
+  }
+
+  revalidatePath("/admin/products");
+  revalidatePath(`/admin/products/${image.product_id}`);
+  return { ok: true, id: imageId };
+}
+
+
+// ----------------------------------------------------------------------------
+// Image management — set hero
+// ----------------------------------------------------------------------------
+// Promote a specific image to be the hero. The previous hero (if any) is
+// demoted in the same action.
+//
+// Implementation: two sequential UPDATEs (demote-then-promote) rather than
+// a single atomic statement. supabase-js can't express
+// `SET is_hero = (id = $target)` in its query builder, and adding a SQL
+// function via RPC would require a migration for very little practical gain
+// in a single-admin CRM. The theoretical race window — two admins clicking
+// Make Hero on different images in the same product within microseconds —
+// is not a real concern here.
+//
+// If we ever need to close this for real, the right move is a partial
+// unique index `(product_id) WHERE is_hero = true`, which makes the DB
+// reject the second update and incidentally also closes the attachImage
+// "first image becomes hero" race flagged last session. That's a one-line
+// migration we'll write the day we add multi-admin editing.
+
+type SetHeroImageResult =
+  | { ok: true; id: string }
+  | { ok: false; formError: string };
+
+export async function setHeroImage(
+  imageId: string
+): Promise<SetHeroImageResult> {
+  const supabase = await createClient();
+
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) {
+    return { ok: false, formError: "Not authenticated" };
+  }
+
+  // Look up the target so we know its product_id and can short-circuit if
+  // it's already the hero.
+  const { data: target, error: lookupError } = await supabase
+    .from("product_images")
+    .select("id, product_id, is_hero")
+    .eq("id", imageId)
+    .single();
+  if (lookupError || !target) {
+    return { ok: false, formError: "Image not found" };
+  }
+
+  if (target.is_hero) {
+    // No-op — already hero. Return success so the UI behaves naturally.
+    return { ok: true, id: imageId };
+  }
+
+  // Step 1 — demote whichever image is currently hero for this product.
+  // Scoped by product_id so we never touch other products' hero rows.
+  const { error: demoteError } = await supabase
+    .from("product_images")
+    .update({ is_hero: false })
+    .eq("product_id", target.product_id)
+    .eq("is_hero", true);
+  if (demoteError) {
+    return { ok: false, formError: demoteError.message };
+  }
+
+  // Step 2 — promote the chosen image.
+  const { error: promoteError } = await supabase
+    .from("product_images")
+    .update({ is_hero: true })
+    .eq("id", imageId);
+  if (promoteError) {
+    // Theoretical: previous hero is now demoted and this image is also not
+    // hero. The product has no hero until the next setHeroImage call. This
+    // is recoverable from the UI (admin clicks again) and never silently
+    // bad — the error is surfaced.
+    return {
+      ok: false,
+      formError: `Demoted previous hero but failed to promote: ${promoteError.message}`,
+    };
+  }
+
+  revalidatePath("/admin/products");
+  revalidatePath(`/admin/products/${target.product_id}`);
+  return { ok: true, id: imageId };
+}
