@@ -42,3 +42,6 @@ next-env.d.ts
 
 # Allow the example env file (no real secrets, just placeholders)
 !.env.example
+
+# Supabase CLI local state
+supabase/.temp/
