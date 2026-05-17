@@ -3,48 +3,79 @@ import { createClient } from "@/lib/supabase/server";
 export default async function SupabaseTestPage() {
   const supabase = await createClient();
 
-  // Try a simple call: get the auth session (will be null, but proves connection works)
-  const { data: { session }, error } = await supabase.auth.getSession();
+  const { data: products, error } = await supabase
+    .from("products")
+    .select("id, sku, name, brand, condition, condition_grade, price_pence, status")
+    .order("created_at", { ascending: false });
 
-  const connected = !error;
-  const errorMessage = error?.message ?? null;
+  const formatPrice = (pence: number) =>
+    new Intl.NumberFormat("en-GB", {
+      style: "currency",
+      currency: "GBP",
+    }).format(pence / 100);
 
   return (
     <main className="min-h-screen bg-paper text-ink px-6 py-16">
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <div className="text-xs tracking-[0.22em] uppercase mb-4 text-stone-500">
-          Internal · Connection test
+          Internal · Database test
         </div>
-        <h1 className="text-3xl font-black tracking-tight mb-8">
-          Supabase connection
+        <h1 className="text-3xl font-black tracking-tight mb-2">
+          Products
         </h1>
+        <p className="text-stone-500 text-sm mb-10">
+          Reading from Supabase{products && ` · ${products.length} ${products.length === 1 ? "row" : "rows"}`}
+        </p>
 
-        <div className="border-2 border-rule rounded-sm p-6 mb-6">
-          <div className="text-xs tracking-[0.18em] uppercase font-bold mb-2 text-stone-500">
-            Status
-          </div>
-          <div
-            className={`text-2xl font-black tracking-tight ${
-              connected ? "text-emerald-700" : "text-red-700"
-            }`}
-          >
-            {connected ? "✓ Connected" : "✗ Failed"}
-          </div>
-          {errorMessage && (
-            <div className="mt-4 text-sm font-mono text-red-900 bg-red-50 p-3 rounded">
-              {errorMessage}
+        {error && (
+          <div className="border-2 border-red-700 bg-red-50 text-red-900 p-6 rounded-sm mb-6">
+            <div className="text-xs tracking-[0.18em] uppercase font-bold mb-2">
+              Query failed
             </div>
-          )}
-        </div>
+            <div className="text-sm font-mono">{error.message}</div>
+          </div>
+        )}
 
-        <div className="border-2 border-rule rounded-sm p-6">
-          <div className="text-xs tracking-[0.18em] uppercase font-bold mb-2 text-stone-500">
-            Session
+        {products && products.length > 0 && (
+          <div className="border-2 border-rule rounded-sm overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-ink text-paper">
+                <tr>
+                  <th className="text-left px-4 py-3 font-bold tracking-[0.12em] uppercase text-xs">SKU</th>
+                  <th className="text-left px-4 py-3 font-bold tracking-[0.12em] uppercase text-xs">Name</th>
+                  <th className="text-left px-4 py-3 font-bold tracking-[0.12em] uppercase text-xs">Brand</th>
+                  <th className="text-left px-4 py-3 font-bold tracking-[0.12em] uppercase text-xs">Condition</th>
+                  <th className="text-right px-4 py-3 font-bold tracking-[0.12em] uppercase text-xs">Price</th>
+                  <th className="text-left px-4 py-3 font-bold tracking-[0.12em] uppercase text-xs">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {products.map((p) => (
+                  <tr key={p.id} className="border-t border-rule hover:bg-rule/40">
+                    <td className="px-4 py-3 font-mono text-xs text-stone-600">{p.sku}</td>
+                    <td className="px-4 py-3 font-bold">{p.name}</td>
+                    <td className="px-4 py-3">{p.brand}</td>
+                    <td className="px-4 py-3">
+                      {p.condition === "used" ? (
+                        <span>
+                          Used <span className="text-stone-500">· Grade {p.condition_grade}</span>
+                        </span>
+                      ) : (
+                        <span>New</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right font-bold">{formatPrice(p.price_pence)}</td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs tracking-[0.12em] uppercase font-bold ${p.status === "live" ? "text-emerald-700" : "text-stone-500"}`}>
+                        {p.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <div className="text-sm font-mono">
-            {session ? JSON.stringify(session, null, 2) : "No session (expected — not signed in yet)"}
-          </div>
-        </div>
+        )}
 
         <p className="text-xs text-stone-500 mt-12">
           This is a temporary diagnostic page. It will be removed once the CRM is built.
