@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      product_images: {
+        Row: {
+          alt_text: string
+          cloudinary_public_id: string
+          cloudinary_url: string
+          created_at: string
+          id: string
+          is_hero: boolean
+          product_id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          alt_text?: string
+          cloudinary_public_id: string
+          cloudinary_url: string
+          created_at?: string
+          id?: string
+          is_hero?: boolean
+          product_id: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          alt_text?: string
+          cloudinary_public_id?: string
+          cloudinary_url?: string
+          created_at?: string
+          id?: string
+          is_hero?: boolean
+          product_id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_images_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           brand: string | null
