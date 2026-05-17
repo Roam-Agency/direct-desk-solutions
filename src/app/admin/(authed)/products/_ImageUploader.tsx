@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState, useTransition } from "react";
-import { generateUploadSignature, attachImage, deleteImage, setHeroImage } from "./_actions";
+import { generateUploadSignature, attachImage, deleteImage, setHeroImage, updateImageAltText } from "./_actions";
 
 /**
  * Image uploader for the product form.
@@ -392,6 +392,39 @@ export function ImageUploader({
     });
   };
 
+  // Save alt text on blur. Uncontrolled input: we read the event target's
+  // current value and compare to what's in state. No-op if unchanged so we
+  // don't fire a network call for every focus-lose.
+  //
+  // On error: revert the input's value to what's in state and alert. We
+  // mutate the input element directly because the input is uncontrolled —
+  // React isn't managing its value.
+  const handleAltTextBlur = async (
+    imageId: string,
+    e: React.FocusEvent<HTMLInputElement>
+  ) => {
+    const inputEl = e.currentTarget;
+    const newValue = inputEl.value.trim();
+    const current = images.find((i) => i.id === imageId);
+    if (!current || newValue === current.alt_text) return;
+
+    const result = await updateImageAltText(imageId, newValue);
+    if (!result.ok) {
+      // Revert the input to the pre-edit value and tell the admin why.
+      inputEl.value = current.alt_text;
+      window.alert(`Could not save alt text: ${result.formError}`);
+      return;
+    }
+
+    // Update local state silently. No re-render of the input needed
+    // because it's uncontrolled and already holds the new value.
+    setImages((images) =>
+      images.map((i) =>
+        i.id === imageId ? { ...i, alt_text: newValue } : i
+      )
+    );
+  };
+
   return (
     <div>
       <div
@@ -506,44 +539,53 @@ export function ImageUploader({
             {images.map((img) => {
               const isDeleting = deletingIds.has(img.id);
               return (
-                <div
-                  key={img.id}
-                  className={`group relative aspect-square border border-rule bg-paper transition ${
-                    isDeleting ? "opacity-40" : ""
-                  }`}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={img.cloudinary_url}
-                    alt={img.alt_text || ""}
-                    className="h-full w-full object-cover"
-                  />
-                  {img.is_hero && (
-                    <span className="absolute left-2 top-2 bg-brand-red px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-paper">
-                      Hero
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(img.id)}
-                    disabled={isDeleting}
-                    className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center bg-ink/80 text-paper opacity-0 transition group-hover:opacity-100 hover:bg-brand-red disabled:cursor-wait disabled:opacity-50"
-                    aria-label={`Delete image ${img.alt_text || ""}`.trim()}
+                <div key={img.id} className="space-y-2">
+                  <div
+                    className={`group relative aspect-square border border-rule bg-paper transition ${
+                      isDeleting ? "opacity-40" : ""
+                    }`}
                   >
-                    <span aria-hidden="true" className="text-base leading-none">
-                      ×
-                    </span>
-                  </button>
-                  {!img.is_hero && (
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={img.cloudinary_url}
+                      alt={img.alt_text || ""}
+                      className="h-full w-full object-cover"
+                    />
+                    {img.is_hero && (
+                      <span className="absolute left-2 top-2 bg-brand-red px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-paper">
+                        Hero
+                      </span>
+                    )}
                     <button
                       type="button"
-                      onClick={() => handleSetHero(img.id)}
-                      disabled={settingHeroIds.has(img.id)}
-                      className="absolute inset-x-0 bottom-0 bg-ink/80 px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest text-paper opacity-0 transition group-hover:opacity-100 hover:bg-brand-red disabled:cursor-wait disabled:opacity-50"
+                      onClick={() => handleDelete(img.id)}
+                      disabled={isDeleting}
+                      className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center bg-ink/80 text-paper opacity-0 transition group-hover:opacity-100 hover:bg-brand-red disabled:cursor-wait disabled:opacity-50"
+                      aria-label={`Delete image ${img.alt_text || ""}`.trim()}
                     >
-                      {settingHeroIds.has(img.id) ? "Setting…" : "Make hero"}
+                      <span aria-hidden="true" className="text-base leading-none">
+                        ×
+                      </span>
                     </button>
-                  )}
+                    {!img.is_hero && (
+                      <button
+                        type="button"
+                        onClick={() => handleSetHero(img.id)}
+                        disabled={settingHeroIds.has(img.id)}
+                        className="absolute inset-x-0 bottom-0 bg-ink/80 px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest text-paper opacity-0 transition group-hover:opacity-100 hover:bg-brand-red disabled:cursor-wait disabled:opacity-50"
+                      >
+                        {settingHeroIds.has(img.id) ? "Setting…" : "Make hero"}
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    defaultValue={img.alt_text}
+                    onBlur={(e) => handleAltTextBlur(img.id, e)}
+                    placeholder="Alt text…"
+                    className="w-full border border-rule bg-paper px-2 py-1 text-xs text-ink placeholder:text-ink/30 focus:border-ink focus:outline-none"
+                    aria-label={`Alt text for image ${img.cloudinary_public_id}`}
+                  />
                 </div>
               );
             })}

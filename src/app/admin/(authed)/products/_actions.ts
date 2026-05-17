@@ -475,3 +475,53 @@ export async function setHeroImage(
   revalidatePath(`/admin/products/${target.product_id}`);
   return { ok: true, id: imageId };
 }
+
+
+// ----------------------------------------------------------------------------
+// Image management — update alt text
+// ----------------------------------------------------------------------------
+// Single-field update for accessibility. Called on blur from the alt-text
+// input below each thumbnail.
+//
+// Trim whitespace before persisting — admins typing in a form field tend to
+// leave trailing spaces. Empty string is a valid value (means "decorative,
+// no alt text"), so we don't coerce to null.
+
+type UpdateImageAltTextResult =
+  | { ok: true; id: string }
+  | { ok: false; formError: string };
+
+export async function updateImageAltText(
+  imageId: string,
+  altText: string
+): Promise<UpdateImageAltTextResult> {
+  const supabase = await createClient();
+
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) {
+    return { ok: false, formError: "Not authenticated" };
+  }
+
+  // Look up the row's product_id so we can revalidate the right path.
+  // Also confirms the row exists before we attempt the update.
+  const { data: image, error: lookupError } = await supabase
+    .from("product_images")
+    .select("product_id")
+    .eq("id", imageId)
+    .single();
+  if (lookupError || !image) {
+    return { ok: false, formError: "Image not found" };
+  }
+
+  const { error: updateError } = await supabase
+    .from("product_images")
+    .update({ alt_text: altText.trim() })
+    .eq("id", imageId);
+  if (updateError) {
+    return { ok: false, formError: updateError.message };
+  }
+
+  revalidatePath("/admin/products");
+  revalidatePath(`/admin/products/${image.product_id}`);
+  return { ok: true, id: imageId };
+}
