@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { createClient as createBareClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import type { Database } from "@/types/database";
 
@@ -45,17 +46,26 @@ export async function createClient() {
  * NEVER expose to client code. NEVER use the SECRET key in a NEXT_PUBLIC_* var.
  */
 export function createAdminClient() {
-  return createServerClient<Database>(
+  // We use the bare `@supabase/supabase-js` client here, NOT `@supabase/ssr`,
+  // because the SSR wrapper is designed around cookie-bound user sessions and
+  // routes its requests through the GoTrue authorization layer. With new-format
+  // service-role keys (`sb_secret_*`) the SSR wrapper's auth handling does NOT
+  // correctly identify the request as service-role, so RLS is still enforced
+  // and queries against locked-down tables (e.g. upload_tokens) silently
+  // return zero rows.
+  //
+  // The bare client just sends the key as the `apikey` and `Authorization:
+  // Bearer` headers without any session handling, which is exactly what
+  // service-role usage requires. We also explicitly disable session
+  // persistence + auto-refresh, which would otherwise try to manage tokens
+  // on the server (where there's no browser storage anyway).
+  return createBareClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SECRET_KEY!,
     {
-      cookies: {
-        getAll() {
-          return [];
-        },
-        setAll() {
-          // no-op: admin client doesn't track sessions
-        },
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
       },
     }
   );

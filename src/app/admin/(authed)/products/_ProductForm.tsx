@@ -546,10 +546,11 @@ export default function ProductForm({
       {isEdit && initialProduct && (
         <Section
           title="Images"
-          subtitle="Drag-drop or browse to upload. Reorder + delete coming next session."
+          subtitle="Drag-drop, browse, or send to phone. Drag to reorder, hover for delete and hero controls."
         >
           <ImageUploader
             productId={initialProduct.id}
+            productName={initialProduct.name}
             initialImages={initialImages}
           />
         </Section>

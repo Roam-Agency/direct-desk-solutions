@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import {
   DndContext,
   closestCenter,
@@ -24,6 +24,8 @@ import {
   updateImageAltText,
   reorderImages,
 } from "./_actions";
+import { SendToPhoneModal } from "./_SendToPhoneModal";
+import { createClient as createBrowserSupabase } from "@/lib/supabase/client";
 
 /**
  * Image uploader for the product form.
@@ -94,6 +96,7 @@ function SortableThumbnail({
   img,
   isDeleting,
   isSettingHero,
+  isNewlyArrived,
   onDelete,
   onSetHero,
   onAltTextBlur,
@@ -101,6 +104,7 @@ function SortableThumbnail({
   img: AttachedImage;
   isDeleting: boolean;
   isSettingHero: boolean;
+  isNewlyArrived: boolean;
   onDelete: (id: string) => void;
   onSetHero: (id: string) => void;
   onAltTextBlur: (
@@ -149,6 +153,11 @@ function SortableThumbnail({
             Hero
           </span>
         )}
+        {isNewlyArrived && (
+          <span className="absolute left-2 right-2 top-1/2 -translate-y-1/2 bg-ink px-2 py-1 text-center text-[10px] font-bold uppercase tracking-widest text-paper pointer-events-none">
+            New from phone
+          </span>
+        )}
         <button
           type="button"
           onClick={(e) => {
@@ -194,9 +203,11 @@ function SortableThumbnail({
 
 export function ImageUploader({
   productId,
+  productName,
   initialImages,
 }: {
   productId: string;
+  productName: string;
   initialImages: AttachedImage[];
 }) {
   const [images, setImages] = useState<AttachedImage[]>(initialImages);
@@ -217,7 +228,79 @@ export function ImageUploader({
   // call for a given clientId does any work.
   const processedClientIdsRef = useRef<Set<string>>(new Set());
   const [, startTransition] = useTransition();
+  const [sendToPhoneOpen, setSendToPhoneOpen] = useState(false);
+  // Ids of images that arrived via the realtime channel within the last few
+  // seconds. Used to render a transient "NEW FROM PHONE" badge so the admin
+  // gets a clear visual confirmation that a mobile upload has landed.
+  const [newlyArrivedIds, setNewlyArrivedIds] = useState<Set<string>>(new Set());
+
+  // Subscribe to inserts on product_images for this product so that uploads
+  // from a paired phone show up live in the desktop grid. The channel is
+  // scoped per-mount (per productId), torn down on unmount.
+  //
+  // Dedupe: any insert whose id is already in our local images state is
+  // ignored. That covers the case where the admin uploads via desktop
+  // browse-files — that path optimistically updates state AND triggers a
+  // realtime insert event, but we don't want to double-render the thumbnail
+  // or flash a "NEW FROM PHONE" badge on the admin's own upload.
+  useEffect(() => {
+    const supabase = createBrowserSupabase();
+    const channel = supabase
+      .channel(`product_images:${productId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "product_images",
+          filter: `product_id=eq.${productId}`,
+        },
+        (payload) => {
+          const row = payload.new as AttachedImage & { product_id: string };
+          setImages((current) => {
+            if (current.some((img) => img.id === row.id)) {
+              return current;
+            }
+            return [
+              ...current,
+              {
+                id: row.id,
+                cloudinary_public_id: row.cloudinary_public_id,
+                cloudinary_url: row.cloudinary_url,
+                alt_text: row.alt_text ?? "",
+                is_hero: row.is_hero,
+                sort_order: row.sort_order,
+              },
+            ];
+          });
+          // Flag as newly arrived so the badge renders. Schedule its removal
+          // after 4 seconds so the badge fades on its own.
+          setNewlyArrivedIds((current) => {
+            const next = new Set(current);
+            next.add(row.id);
+            return next;
+          });
+          setTimeout(() => {
+            setNewlyArrivedIds((current) => {
+              const next = new Set(current);
+              next.delete(row.id);
+              return next;
+            });
+          }, 4000);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [productId]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Separate input for the camera-direct shortcut. We need a second element
+  // because the `capture` attribute lives on the input itself — toggling it
+  // on the same input would either always prompt the camera (annoying for
+  // desktop "browse files") or never prompt the camera (defeating the point).
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Drive the upload queue: whenever uploads state changes, kick off any
   // pending uploads up to the concurrency cap. Uses a ref to avoid stale
@@ -648,6 +731,22 @@ export function ImageUploader({
           >
             browse files
           </button>
+          ,{" "}
+          <button
+            type="button"
+            onClick={() => cameraInputRef.current?.click()}
+            className="font-bold text-brand-red underline underline-offset-2"
+          >
+            use camera
+          </button>
+          {" "}or{" "}
+          <button
+            type="button"
+            onClick={() => setSendToPhoneOpen(true)}
+            className="font-bold text-brand-red underline underline-offset-2"
+          >
+            send to phone
+          </button>
           . JPG, PNG, WebP, GIF, or HEIC up to 15MB each.
         </p>
         <input
@@ -655,6 +754,22 @@ export function ImageUploader({
           type="file"
           accept={ACCEPTED_MIME_TYPES.join(",")}
           multiple
+          className="hidden"
+          onChange={(e) => handleFiles(e.target.files)}
+        />
+        {/*
+          Camera-direct input. On mobile browsers the `capture` attribute
+          opens the rear camera; on desktop browsers without a camera, the
+          attribute is ignored and the user gets the regular file picker.
+          accept="image/*" instead of the strict ACCEPTED_MIME_TYPES list
+          because some mobile cameras deliver as application/octet-stream
+          and the MIME validation downstream in handleFiles is sufficient.
+        */}
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
         />
@@ -739,6 +854,7 @@ export function ImageUploader({
                     img={img}
                     isDeleting={deletingIds.has(img.id)}
                     isSettingHero={settingHeroIds.has(img.id)}
+                    isNewlyArrived={newlyArrivedIds.has(img.id)}
                     onDelete={handleDelete}
                     onSetHero={handleSetHero}
                     onAltTextBlur={handleAltTextBlur}
@@ -749,7 +865,14 @@ export function ImageUploader({
           </DndContext>
         </div>
       )}
-    </div>
+    {sendToPhoneOpen && (
+      <SendToPhoneModal
+        productId={productId}
+        productName={productName}
+        onClose={() => setSendToPhoneOpen(false)}
+      />
+    )}
+  </div>
   );
 }
 
