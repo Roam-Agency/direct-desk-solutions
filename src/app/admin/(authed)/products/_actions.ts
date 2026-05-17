@@ -392,3 +392,86 @@ export async function deleteImage(imageId: string): Promise<DeleteImageResult> {
   revalidatePath(`/admin/products/${image.product_id}`);
   return { ok: true, id: imageId };
 }
+
+
+// ----------------------------------------------------------------------------
+// Image management — set hero
+// ----------------------------------------------------------------------------
+// Promote a specific image to be the hero. The previous hero (if any) is
+// demoted in the same action.
+//
+// Implementation: two sequential UPDATEs (demote-then-promote) rather than
+// a single atomic statement. supabase-js can't express
+// `SET is_hero = (id = $target)` in its query builder, and adding a SQL
+// function via RPC would require a migration for very little practical gain
+// in a single-admin CRM. The theoretical race window — two admins clicking
+// Make Hero on different images in the same product within microseconds —
+// is not a real concern here.
+//
+// If we ever need to close this for real, the right move is a partial
+// unique index `(product_id) WHERE is_hero = true`, which makes the DB
+// reject the second update and incidentally also closes the attachImage
+// "first image becomes hero" race flagged last session. That's a one-line
+// migration we'll write the day we add multi-admin editing.
+
+type SetHeroImageResult =
+  | { ok: true; id: string }
+  | { ok: false; formError: string };
+
+export async function setHeroImage(
+  imageId: string
+): Promise<SetHeroImageResult> {
+  const supabase = await createClient();
+
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) {
+    return { ok: false, formError: "Not authenticated" };
+  }
+
+  // Look up the target so we know its product_id and can short-circuit if
+  // it's already the hero.
+  const { data: target, error: lookupError } = await supabase
+    .from("product_images")
+    .select("id, product_id, is_hero")
+    .eq("id", imageId)
+    .single();
+  if (lookupError || !target) {
+    return { ok: false, formError: "Image not found" };
+  }
+
+  if (target.is_hero) {
+    // No-op — already hero. Return success so the UI behaves naturally.
+    return { ok: true, id: imageId };
+  }
+
+  // Step 1 — demote whichever image is currently hero for this product.
+  // Scoped by product_id so we never touch other products' hero rows.
+  const { error: demoteError } = await supabase
+    .from("product_images")
+    .update({ is_hero: false })
+    .eq("product_id", target.product_id)
+    .eq("is_hero", true);
+  if (demoteError) {
+    return { ok: false, formError: demoteError.message };
+  }
+
+  // Step 2 — promote the chosen image.
+  const { error: promoteError } = await supabase
+    .from("product_images")
+    .update({ is_hero: true })
+    .eq("id", imageId);
+  if (promoteError) {
+    // Theoretical: previous hero is now demoted and this image is also not
+    // hero. The product has no hero until the next setHeroImage call. This
+    // is recoverable from the UI (admin clicks again) and never silently
+    // bad — the error is surfaced.
+    return {
+      ok: false,
+      formError: `Demoted previous hero but failed to promote: ${promoteError.message}`,
+    };
+  }
+
+  revalidatePath("/admin/products");
+  revalidatePath(`/admin/products/${target.product_id}`);
+  return { ok: true, id: imageId };
+}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState, useTransition } from "react";
-import { generateUploadSignature, attachImage, deleteImage } from "./_actions";
+import { generateUploadSignature, attachImage, deleteImage, setHeroImage } from "./_actions";
 
 /**
  * Image uploader for the product form.
@@ -79,6 +79,8 @@ export function ImageUploader({
   // Track in-flight deletes so the button disables + the thumbnail dims
   // while Cloudinary destroys the asset. Set, not array, for O(1) membership.
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  // Same shape for in-flight hero promotions.
+  const [settingHeroIds, setSettingHeroIds] = useState<Set<string>>(new Set());
   const [, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -336,6 +338,60 @@ export function ImageUploader({
     });
   };
 
+  // Promote an image to hero. The previous hero (if any) becomes not-hero.
+  //
+  // Optimistic UI mirrors what setHeroImage does on the server: locally swap
+  // is_hero so the new target shows the badge and the previous hero loses it.
+  // On error, revert and alert.
+  const handleSetHero = async (imageId: string) => {
+    const target = images.find((i) => i.id === imageId);
+    if (!target || target.is_hero) return;
+
+    // Snapshot for revert. We only need the id of the previous hero.
+    const previousHero = images.find((i) => i.is_hero);
+
+    setSettingHeroIds((current) => {
+      const next = new Set(current);
+      next.add(imageId);
+      return next;
+    });
+
+    // Optimistic swap.
+    startTransition(() => {
+      setImages((current) =>
+        current.map((i) => {
+          if (i.id === imageId) return { ...i, is_hero: true };
+          if (i.is_hero) return { ...i, is_hero: false };
+          return i;
+        })
+      );
+    });
+
+    const result = await setHeroImage(imageId);
+
+    if (!result.ok) {
+      // Revert the optimistic swap.
+      startTransition(() => {
+        setImages((current) =>
+          current.map((i) => {
+            if (i.id === imageId) return { ...i, is_hero: false };
+            if (previousHero && i.id === previousHero.id) {
+              return { ...i, is_hero: true };
+            }
+            return i;
+          })
+        );
+      });
+      window.alert(`Could not set hero: ${result.formError}`);
+    }
+
+    setSettingHeroIds((current) => {
+      const next = new Set(current);
+      next.delete(imageId);
+      return next;
+    });
+  };
+
   return (
     <div>
       <div
@@ -478,6 +534,16 @@ export function ImageUploader({
                       ×
                     </span>
                   </button>
+                  {!img.is_hero && (
+                    <button
+                      type="button"
+                      onClick={() => handleSetHero(img.id)}
+                      disabled={settingHeroIds.has(img.id)}
+                      className="absolute inset-x-0 bottom-0 bg-ink/80 px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest text-paper opacity-0 transition group-hover:opacity-100 hover:bg-brand-red disabled:cursor-wait disabled:opacity-50"
+                    >
+                      {settingHeroIds.has(img.id) ? "Setting…" : "Make hero"}
+                    </button>
+                  )}
                 </div>
               );
             })}
