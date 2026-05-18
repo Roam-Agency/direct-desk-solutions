@@ -12,6 +12,7 @@ import {
 import type { ProductInput } from "@/lib/products/schema";
 import { parseDisplayPriceToPence, formatPence } from "@/lib/products/format";
 import { ImageUploader } from "./_ImageUploader";
+import { MarginCalculator } from "./_MarginCalculator";
 import type { Database } from "@/types/database";
 
 type ProductRow = Database["public"]["Tables"]["products"]["Row"];
@@ -425,6 +426,7 @@ export default function ProductForm({
             className="w-full border border-rule bg-paper px-4 py-3 font-mono focus:border-brand-red focus:outline-none"
           />
         </Field>
+        <MarginCalculator price={price} costPrice={costPrice} />
       </Section>
 
       <Section title="Stock & ops">
