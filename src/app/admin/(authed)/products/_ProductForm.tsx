@@ -13,6 +13,8 @@ import type { ProductInput } from "@/lib/products/schema";
 import { parseDisplayPriceToPence, formatPence } from "@/lib/products/format";
 import { ImageUploader } from "./_ImageUploader";
 import { MarginCalculator } from "./_MarginCalculator";
+import { CategoryPicker } from "./_CategoryPicker";
+import { setProductCategories } from "../categories/_actions";
 import type { Database } from "@/types/database";
 
 type ProductRow = Database["public"]["Tables"]["products"]["Row"];
@@ -24,6 +26,15 @@ interface ProductFormProps {
   initialProduct?: ProductRow;
   /** Already-attached images (edit mode only). Defaults to empty. */
   initialImages?: ProductImageRow[];
+  /** All active categories (used to render the picker in edit mode). */
+  allCategories?: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    kind: Database["public"]["Enums"]["category_kind"];
+  }>;
+  /** Existing category assignments for this product (edit mode only). */
+  initialCategoryIds?: string[];
 }
 
 /**
@@ -42,12 +53,19 @@ interface ProductFormProps {
 export default function ProductForm({
   initialProduct,
   initialImages = [],
+  allCategories = [],
+  initialCategoryIds = [],
 }: ProductFormProps) {
   const router = useRouter();
   const isEdit = Boolean(initialProduct);
   const [isPending, startTransition] = useTransition();
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [selectedCategoryIds, setSelectedCategoryIds] =
+    useState<string[]>(initialCategoryIds);
+  const [categoriesWarning, setCategoriesWarning] = useState<string | null>(
+    null
+  );
 
   // Strip the £ symbol so the input shows "499.00" not "£499.00"
   const priceDisplay = (pence: number | null | undefined): string => {
@@ -201,6 +219,24 @@ export default function ProductForm({
         : await createProduct(input);
 
       if (result.ok) {
+        // Edit mode: persist category assignments alongside the product save.
+        // Create mode redirects to the edit page, so categories get assigned
+        // on the next save (same pattern as images).
+        if (isEdit && initialProduct) {
+          const catResult = await setProductCategories(
+            initialProduct.id,
+            selectedCategoryIds
+          );
+          if (!catResult.ok && catResult.formError) {
+            // Product itself saved fine; surface a non-fatal warning.
+            setCategoriesWarning(
+              `Product saved, but categories failed: ${catResult.formError}`
+            );
+            router.refresh();
+            return;
+          }
+        }
+
         if (!isEdit && result.id) {
           router.push(`/admin/products/${result.id}`);
         } else {
@@ -428,6 +464,21 @@ export default function ProductForm({
         </Field>
         <MarginCalculator price={price} costPrice={costPrice} />
       </Section>
+
+      {isEdit && (
+        <Section title="Categories">
+          {categoriesWarning && (
+            <div className="mb-4 border-l-4 border-amber-500 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              {categoriesWarning}
+            </div>
+          )}
+          <CategoryPicker
+            allCategories={allCategories}
+            selectedIds={selectedCategoryIds}
+            onChange={setSelectedCategoryIds}
+          />
+        </Section>
+      )}
 
       <Section title="Stock & ops">
         <Field label="Stock quantity" error={fieldErrors.stock_quantity}>

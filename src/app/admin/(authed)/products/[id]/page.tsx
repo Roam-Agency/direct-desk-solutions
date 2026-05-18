@@ -17,23 +17,38 @@ export default async function EditProductPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  // Two parallel fetches — the product itself and any already-attached
-  // images. We render the form regardless of whether images exist; only
-  // the product's existence gates the page.
-  const [productResult, imagesResult] = await Promise.all([
-    supabase.from("products").select("*").eq("id", id).single(),
-    supabase
-      .from("product_images")
-      .select("*")
-      .eq("product_id", id)
-      .order("sort_order", { ascending: true }),
-  ]);
+  // Four parallel fetches — the product, attached images, existing
+  // category assignments, and all active categories for the picker.
+  // Only the product's existence gates the page.
+  const [productResult, imagesResult, assignmentsResult, categoriesResult] =
+    await Promise.all([
+      supabase.from("products").select("*").eq("id", id).single(),
+      supabase
+        .from("product_images")
+        .select("*")
+        .eq("product_id", id)
+        .order("sort_order", { ascending: true }),
+      supabase
+        .from("product_categories")
+        .select("category_id")
+        .eq("product_id", id),
+      supabase
+        .from("categories")
+        .select("id, name, slug, kind")
+        .eq("is_active", true)
+        .order("kind", { ascending: true })
+        .order("sort_order", { ascending: true }),
+    ]);
 
   if (productResult.error || !productResult.data) {
     notFound();
   }
   const product = productResult.data;
   const images = imagesResult.data ?? [];
+  const initialCategoryIds = (assignmentsResult.data ?? []).map(
+    (a) => a.category_id
+  );
+  const allCategories = categoriesResult.data ?? [];
 
   return (
     <div>
@@ -51,7 +66,12 @@ export default async function EditProductPage({
       </div>
 
       <div className="mt-10">
-        <ProductForm initialProduct={product} initialImages={images} />
+        <ProductForm
+          initialProduct={product}
+          initialImages={images}
+          allCategories={allCategories}
+          initialCategoryIds={initialCategoryIds}
+        />
       </div>
     </div>
   );
