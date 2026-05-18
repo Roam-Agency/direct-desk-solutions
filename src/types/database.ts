@@ -144,6 +144,95 @@ export type Database = {
           },
         ]
       }
+      condition_report_items: {
+        Row: {
+          area: string
+          created_at: string
+          description: string
+          id: string
+          image_id: string | null
+          report_id: string
+          severity: Database["public"]["Enums"]["condition_severity"]
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          area: string
+          created_at?: string
+          description: string
+          id?: string
+          image_id?: string | null
+          report_id: string
+          severity: Database["public"]["Enums"]["condition_severity"]
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          area?: string
+          created_at?: string
+          description?: string
+          id?: string
+          image_id?: string | null
+          report_id?: string
+          severity?: Database["public"]["Enums"]["condition_severity"]
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "condition_report_items_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "condition_reports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "condition_report_items_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "product_images"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      condition_reports: {
+        Row: {
+          created_at: string
+          grade: Database["public"]["Enums"]["product_grade"] | null
+          id: string
+          product_id: string
+          published_at: string | null
+          summary: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          grade?: Database["public"]["Enums"]["product_grade"] | null
+          id?: string
+          product_id: string
+          published_at?: string | null
+          summary?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          grade?: Database["public"]["Enums"]["product_grade"] | null
+          id?: string
+          product_id?: string
+          published_at?: string | null
+          summary?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "condition_reports_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           brand: string | null
@@ -275,6 +364,7 @@ export type Database = {
     }
     Enums: {
       category_kind: "functional" | "brand" | "merchandising"
+      condition_severity: "faultless" | "light" | "moderate" | "significant"
       product_condition: "new" | "used"
       product_grade: "A" | "B" | "C"
       product_status: "draft" | "live" | "archived"
@@ -406,6 +496,7 @@ export const Constants = {
   public: {
     Enums: {
       category_kind: ["functional", "brand", "merchandising"],
+      condition_severity: ["faultless", "light", "moderate", "significant"],
       product_condition: ["new", "used"],
       product_grade: ["A", "B", "C"],
       product_status: ["draft", "live", "archived"],

@@ -12,6 +12,7 @@ import {
 import type { ProductInput } from "@/lib/products/schema";
 import { parseDisplayPriceToPence, formatPence } from "@/lib/products/format";
 import { ImageUploader } from "./_ImageUploader";
+import { ConditionReportSection } from "./_ConditionReportSection";
 import { MarginCalculator } from "./_MarginCalculator";
 import { CategoryPicker } from "./_CategoryPicker";
 import { setProductCategories } from "../categories/_actions";
@@ -20,6 +21,10 @@ import type { Database } from "@/types/database";
 type ProductRow = Database["public"]["Tables"]["products"]["Row"];
 type ProductImageRow =
   Database["public"]["Tables"]["product_images"]["Row"];
+type ConditionReportRow =
+  Database["public"]["Tables"]["condition_reports"]["Row"];
+type ConditionReportItemRow =
+  Database["public"]["Tables"]["condition_report_items"]["Row"];
 
 interface ProductFormProps {
   /** Present = edit mode, absent = create mode. */
@@ -35,6 +40,10 @@ interface ProductFormProps {
   }>;
   /** Existing category assignments for this product (edit mode only). */
   initialCategoryIds?: string[];
+  /** Existing condition report for this product (edit mode, used items only). May be null. */
+  initialReport?: ConditionReportRow | null;
+  /** Items belonging to the report. Empty if no report yet. */
+  initialReportItems?: ConditionReportItemRow[];
 }
 
 /**
@@ -53,6 +62,8 @@ interface ProductFormProps {
 export default function ProductForm({
   initialProduct,
   initialImages = [],
+  initialReport = null,
+  initialReportItems = [],
   allCategories = [],
   initialCategoryIds = [],
 }: ProductFormProps) {
@@ -606,6 +617,20 @@ export default function ProductForm({
             productName={initialProduct.name}
             initialImages={initialImages}
             categories={allCategories}
+          />
+        </Section>
+      )}
+
+      {isEdit && initialProduct && condition === "used" && (
+        <Section
+          title="Condition report"
+          subtitle="Itemised observations for the buyer-facing condition report. Used items only."
+        >
+          <ConditionReportSection
+            productId={initialProduct.id}
+            initialReport={initialReport}
+            initialReportItems={initialReportItems}
+            attachedImages={initialImages}
           />
         </Section>
       )}
