@@ -49,6 +49,12 @@ export default async function AdminLayout({
               >
                 Products
               </Link>
+              <Link
+                href="/admin/categories"
+                className="text-xs font-bold uppercase tracking-widest text-ink transition hover:text-brand-red"
+              >
+                Categories
+              </Link>
             </nav>
           </div>
 
