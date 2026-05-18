@@ -24,6 +24,12 @@ import {
   updateImageAltText,
   reorderImages,
 } from "./_actions";
+import {
+  suggestImageMetadata,
+  applyAltToImage,
+  applyTagsToProduct,
+  applyCategoriesToProduct,
+} from "./_ai-actions";
 import { SendToPhoneModal } from "./_SendToPhoneModal";
 import { createClient as createBrowserSupabase } from "@/lib/supabase/client";
 
@@ -63,6 +69,21 @@ type AttachedImage = {
   alt_text: string;
   is_hero: boolean;
   sort_order: number;
+  // AI suggestion fields. Null when no suggestion has been generated yet.
+  // The structural shape matches AiSuggestion from src/lib/ai/anthropic.ts,
+  // but typed as a loose record here so we don't pull a server-only import
+  // into a client component.
+  ai_suggestions: AiSuggestionData | null;
+  ai_suggested_at: string | null;
+};
+
+type AiSuggestionData = {
+  alt: string;
+  tags: string[];
+  category_ids: string[];
+  condition_observations: string[];
+  model: string;
+  suggested_at: string;
 };
 
 type UploadItem = {
@@ -92,25 +113,244 @@ function validateFile(file: File): string | null {
 
 // One sortable thumbnail. Has to be its own component because each item
 // calls useSortable, and hooks can't run inside a .map() body.
+/**
+ * AI suggestion strip rendered under each thumbnail. Three states:
+ *
+ *   1. ai_suggestions === null: "Thinking..." placeholder while the
+ *      auto-trigger runs (or before re-suggest finishes).
+ *   2. ai_suggestions populated, collapsed: a single toggle button.
+ *   3. ai_suggestions populated, expanded: alt / tags / categories /
+ *      condition observations with per-section apply buttons.
+ */
+function AiSuggestionStrip({
+  img,
+  isSuggesting,
+  isApplyingAlt,
+  isApplyingTags,
+  isApplyingCategories,
+  categoryNameById,
+  onApplyAlt,
+  onApplyTags,
+  onApplyCategories,
+  onResuggest,
+}: {
+  img: AttachedImage;
+  isSuggesting: boolean;
+  isApplyingAlt: boolean;
+  isApplyingTags: boolean;
+  isApplyingCategories: boolean;
+  categoryNameById: Map<string, string>;
+  onApplyAlt: (imageId: string, alt: string) => void;
+  onApplyTags: (tags: string[]) => void;
+  onApplyCategories: (categoryIds: string[]) => void;
+  onResuggest: (imageId: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const suggestion = img.ai_suggestions;
+
+  // Thinking state — auto-trigger is in flight or a re-suggest is running.
+  if (isSuggesting && !suggestion) {
+    return (
+      <div className="border border-rule bg-paper px-2 py-1.5 text-[10px] uppercase tracking-widest text-ink/50">
+        <span className="inline-block animate-pulse">AI is thinking…</span>
+      </div>
+    );
+  }
+
+  // No suggestion yet and not currently suggesting — show a quiet prompt.
+  if (!suggestion) {
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onResuggest(img.id);
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
+        className="w-full border border-rule bg-paper px-2 py-1.5 text-left text-[10px] font-bold uppercase tracking-widest text-ink/60 transition hover:border-ink hover:text-ink"
+      >
+        Suggest with AI →
+      </button>
+    );
+  }
+
+  // Expanded view — full suggestion with apply buttons.
+  return (
+    <div className="border border-rule bg-paper">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setExpanded((v) => !v);
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
+        className="flex w-full items-center justify-between px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest text-ink/70 transition hover:text-ink"
+      >
+        <span>AI suggestion {isSuggesting ? "· refreshing…" : ""}</span>
+        <span aria-hidden="true">{expanded ? "▾" : "▸"}</span>
+      </button>
+
+      {expanded && (
+        <div className="space-y-2 border-t border-rule px-2 py-2">
+          {/* Alt */}
+          <div className="space-y-1">
+            <div className="text-[10px] font-bold uppercase tracking-widest text-ink/50">
+              Alt text
+            </div>
+            <p className="text-xs text-ink">{suggestion.alt}</p>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onApplyAlt(img.id, suggestion.alt);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              disabled={isApplyingAlt}
+              className="text-[10px] font-bold uppercase tracking-widest text-brand-red transition hover:text-ink disabled:opacity-50"
+            >
+              {isApplyingAlt ? "Applying…" : "Apply alt →"}
+            </button>
+          </div>
+
+          {/* Tags */}
+          {suggestion.tags.length > 0 && (
+            <div className="space-y-1">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-ink/50">
+                Tags
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {suggestion.tags.map((t) => (
+                  <span
+                    key={t}
+                    className="border border-rule px-1.5 py-0.5 text-[10px] text-ink"
+                  >
+                    {t}
+                  </span>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onApplyTags(suggestion.tags);
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                disabled={isApplyingTags}
+                className="text-[10px] font-bold uppercase tracking-widest text-brand-red transition hover:text-ink disabled:opacity-50"
+              >
+                {isApplyingTags ? "Applying…" : "Merge tags into product →"}
+              </button>
+            </div>
+          )}
+
+          {/* Categories */}
+          {suggestion.category_ids.length > 0 && (
+            <div className="space-y-1">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-ink/50">
+                Categories
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {suggestion.category_ids.map((cid) => (
+                  <span
+                    key={cid}
+                    className="border border-rule px-1.5 py-0.5 text-[10px] text-ink"
+                  >
+                    {categoryNameById.get(cid) ?? cid.slice(0, 8)}
+                  </span>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onApplyCategories(suggestion.category_ids);
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                disabled={isApplyingCategories}
+                className="text-[10px] font-bold uppercase tracking-widest text-brand-red transition hover:text-ink disabled:opacity-50"
+              >
+                {isApplyingCategories
+                  ? "Applying…"
+                  : "Add to product categories →"}
+              </button>
+            </div>
+          )}
+
+          {/* Condition observations — display only, feature 4 will consume */}
+          {suggestion.condition_observations.length > 0 && (
+            <div className="space-y-1">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-ink/50">
+                Condition notes (for report)
+              </div>
+              <ul className="space-y-0.5 text-xs text-ink/70">
+                {suggestion.condition_observations.map((obs, i) => (
+                  <li key={i}>· {obs}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Footer: re-suggest + model */}
+          <div className="flex items-center justify-between border-t border-rule pt-2">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onResuggest(img.id);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              disabled={isSuggesting}
+              className="text-[10px] font-bold uppercase tracking-widest text-ink/70 transition hover:text-ink disabled:opacity-50"
+            >
+              {isSuggesting ? "Re-suggesting…" : "Re-suggest"}
+            </button>
+            <span className="text-[10px] text-ink/40">
+              {suggestion.model}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SortableThumbnail({
   img,
   isDeleting,
   isSettingHero,
   isNewlyArrived,
+  isSuggesting,
+  isApplyingAlt,
+  isApplyingTags,
+  isApplyingCategories,
+  categoryNameById,
   onDelete,
   onSetHero,
   onAltTextBlur,
+  onApplyAlt,
+  onApplyTags,
+  onApplyCategories,
+  onResuggest,
 }: {
   img: AttachedImage;
   isDeleting: boolean;
   isSettingHero: boolean;
   isNewlyArrived: boolean;
+  isSuggesting: boolean;
+  isApplyingAlt: boolean;
+  isApplyingTags: boolean;
+  isApplyingCategories: boolean;
+  categoryNameById: Map<string, string>;
   onDelete: (id: string) => void;
   onSetHero: (id: string) => void;
   onAltTextBlur: (
     id: string,
     e: React.FocusEvent<HTMLInputElement>
   ) => void;
+  onApplyAlt: (imageId: string, alt: string) => void;
+  onApplyTags: (tags: string[]) => void;
+  onApplyCategories: (categoryIds: string[]) => void;
+  onResuggest: (imageId: string) => void;
 }) {
   const {
     attributes,
@@ -197,20 +437,73 @@ function SortableThumbnail({
         className="w-full border border-rule bg-paper px-2 py-1 text-xs text-ink placeholder:text-ink/30 focus:border-ink focus:outline-none"
         aria-label={`Alt text for image ${img.cloudinary_public_id}`}
       />
+      <AiSuggestionStrip
+        img={img}
+        isSuggesting={isSuggesting}
+        isApplyingAlt={isApplyingAlt}
+        isApplyingTags={isApplyingTags}
+        isApplyingCategories={isApplyingCategories}
+        categoryNameById={categoryNameById}
+        onApplyAlt={onApplyAlt}
+        onApplyTags={onApplyTags}
+        onApplyCategories={onApplyCategories}
+        onResuggest={onResuggest}
+      />
     </div>
   );
+}
+
+/**
+ * Loose shape accepted at the prop boundary. Matches what the server passes
+ * down (Supabase row with jsonb columns typed as `unknown`-ish Json). We
+ * normalise into AttachedImage inside, where we control the type narrowly.
+ */
+type IncomingImage = {
+  id: string;
+  cloudinary_public_id: string;
+  cloudinary_url: string;
+  alt_text: string;
+  is_hero: boolean;
+  sort_order: number;
+  ai_suggestions: unknown;
+  ai_suggested_at: string | null;
+};
+
+function normaliseIncoming(row: IncomingImage): AttachedImage {
+  // ai_suggestions is jsonb in the DB. When present, it has been written by
+  // suggestImageMetadata after Zod validation, so the shape is trusted.
+  // When absent, it's null.
+  const ai = (row.ai_suggestions ?? null) as AiSuggestionData | null;
+  return {
+    id: row.id,
+    cloudinary_public_id: row.cloudinary_public_id,
+    cloudinary_url: row.cloudinary_url,
+    alt_text: row.alt_text,
+    is_hero: row.is_hero,
+    sort_order: row.sort_order,
+    ai_suggestions: ai,
+    ai_suggested_at: row.ai_suggested_at,
+  };
 }
 
 export function ImageUploader({
   productId,
   productName,
   initialImages,
+  categories,
 }: {
   productId: string;
   productName: string;
-  initialImages: AttachedImage[];
+  initialImages: IncomingImage[];
+  /**
+   * Active categories for this product's tenant — needed to render category
+   * names in the AI suggestion strip (Claude returns UUIDs only).
+   */
+  categories: { id: string; name: string }[];
 }) {
-  const [images, setImages] = useState<AttachedImage[]>(initialImages);
+  const [images, setImages] = useState<AttachedImage[]>(() =>
+    initialImages.map(normaliseIncoming)
+  );
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   // Track in-flight deletes so the button disables + the thumbnail dims
@@ -218,6 +511,22 @@ export function ImageUploader({
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   // Same shape for in-flight hero promotions.
   const [settingHeroIds, setSettingHeroIds] = useState<Set<string>>(new Set());
+  // In-flight AI suggestion runs. Includes both auto-trigger on upload and
+  // manual "Re-suggest" clicks.
+  const [suggestingIds, setSuggestingIds] = useState<Set<string>>(new Set());
+  // In-flight apply-alt / apply-tags / apply-categories runs.
+  const [applyingAltIds, setApplyingAltIds] = useState<Set<string>>(new Set());
+  const [applyingTagsIds, setApplyingTagsIds] = useState<Set<string>>(new Set());
+  const [applyingCategoriesIds, setApplyingCategoriesIds] = useState<
+    Set<string>
+  >(new Set());
+  // Stable lookup for rendering category names in the AI suggestion strip.
+  // Recomputed only when the categories prop identity changes.
+  const categoryNameById = (() => {
+    const m = new Map<string, string>();
+    for (const c of categories) m.set(c.id, c.name);
+    return m;
+  })();
   // Gatekeeper for processUpload: a Set of clientIds that have already
   // entered processUpload. Lives in a ref (not state) so the check is
   // synchronous and not subject to React's render scheduling. The earlier
@@ -256,7 +565,21 @@ export function ImageUploader({
           filter: `product_id=eq.${productId}`,
         },
         (payload) => {
-          const row = payload.new as AttachedImage & { product_id: string };
+          // Realtime row shape — DB columns including the AI fields added
+          // in migration 0006. ai_suggestions is jsonb in the DB; we trust
+          // the AiSuggestionData shape since this column is only ever written
+          // by suggestImageMetadata, which validates with Zod.
+          const row = payload.new as {
+            id: string;
+            product_id: string;
+            cloudinary_public_id: string;
+            cloudinary_url: string;
+            alt_text: string | null;
+            is_hero: boolean;
+            sort_order: number;
+            ai_suggestions: AiSuggestionData | null;
+            ai_suggested_at: string | null;
+          };
           setImages((current) => {
             if (current.some((img) => img.id === row.id)) {
               return current;
@@ -270,6 +593,8 @@ export function ImageUploader({
                 alt_text: row.alt_text ?? "",
                 is_hero: row.is_hero,
                 sort_order: row.sort_order,
+                ai_suggestions: row.ai_suggestions,
+                ai_suggested_at: row.ai_suggested_at,
               },
             ];
           });
@@ -422,6 +747,9 @@ export function ImageUploader({
         alt_text: "",
         is_hero: isFirst,
         sort_order: images.length,
+        // Auto-suggest will populate these shortly after upload.
+        ai_suggestions: null,
+        ai_suggested_at: null,
       };
       startTransition(() => {
         setImages((current) => [...current, newImage]);
@@ -621,6 +949,138 @@ export function ImageUploader({
   // On error: revert the input's value to what's in state and alert. We
   // mutate the input element directly because the input is uncontrolled —
   // React isn't managing its value.
+  // ---------------- AI suggestion handlers ----------------
+
+  /**
+   * Mutate one of the *Ids tracking Sets idempotently. Pattern repeats
+   * for each apply/suggest button so we factor it.
+   */
+  function withIdInSet(
+    setter: React.Dispatch<React.SetStateAction<Set<string>>>,
+    imageId: string,
+    add: boolean
+  ) {
+    setter((current) => {
+      const next = new Set(current);
+      if (add) next.add(imageId);
+      else next.delete(imageId);
+      return next;
+    });
+  }
+
+  /**
+   * Run suggestImageMetadata for one image and merge the resulting
+   * payload into local state. Used by auto-trigger AND the "Re-suggest"
+   * button on the suggestion strip.
+   *
+   * Errors surface via window.alert — the suggestion is non-critical
+   * UI sugar, not something we want to fail loudly inside the grid.
+   */
+  const handleResuggest = useCallback(
+    async (imageId: string) => {
+      withIdInSet(setSuggestingIds, imageId, true);
+      try {
+        const result = await suggestImageMetadata(imageId);
+        if (!result.ok) {
+          window.alert(`AI suggestion failed: ${result.formError}`);
+          return;
+        }
+        setImages((current) =>
+          current.map((i) =>
+            i.id === imageId
+              ? {
+                  ...i,
+                  ai_suggestions: result.suggestion,
+                  ai_suggested_at: result.suggestion.suggested_at,
+                }
+              : i
+          )
+        );
+      } catch (err) {
+        window.alert(
+          `AI suggestion failed: ${err instanceof Error ? err.message : String(err)}`
+        );
+      } finally {
+        withIdInSet(setSuggestingIds, imageId, false);
+      }
+    },
+    []
+  );
+
+  const handleApplyAlt = async (imageId: string, alt: string) => {
+    withIdInSet(setApplyingAltIds, imageId, true);
+    try {
+      const result = await applyAltToImage(imageId, alt);
+      if (!result.ok) {
+        window.alert(`Could not apply alt: ${result.formError}`);
+        return;
+      }
+      // Mirror into local state so the alt input shows the new value
+      // without needing a router refresh.
+      setImages((current) =>
+        current.map((i) =>
+          i.id === imageId ? { ...i, alt_text: alt } : i
+        )
+      );
+    } finally {
+      withIdInSet(setApplyingAltIds, imageId, false);
+    }
+  };
+
+  const handleApplyTags = async (imageId: string, tags: string[]) => {
+    withIdInSet(setApplyingTagsIds, imageId, true);
+    try {
+      const result = await applyTagsToProduct(productId, tags);
+      if (!result.ok) {
+        window.alert(`Could not apply tags: ${result.formError}`);
+      }
+      // The form section that owns the tags input is the parent
+      // ProductForm; revalidatePath in the action ensures the next
+      // navigation sees them. No local mirror needed.
+    } finally {
+      withIdInSet(setApplyingTagsIds, imageId, false);
+    }
+  };
+
+  const handleApplyCategories = async (
+    imageId: string,
+    categoryIds: string[]
+  ) => {
+    withIdInSet(setApplyingCategoriesIds, imageId, true);
+    try {
+      const result = await applyCategoriesToProduct(productId, categoryIds);
+      if (!result.ok) {
+        window.alert(`Could not apply categories: ${result.formError}`);
+      }
+    } finally {
+      withIdInSet(setApplyingCategoriesIds, imageId, false);
+    }
+  };
+
+  /**
+   * Auto-trigger AI suggestion for any image that just landed without
+   * one. Watches the images array and fires once per image (gated by
+   * the autoSuggestedRef Set so re-renders or realtime echoes don't
+   * trigger duplicates).
+   */
+  const autoSuggestedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    for (const img of images) {
+      if (
+        img.ai_suggestions === null &&
+        !autoSuggestedRef.current.has(img.id) &&
+        !suggestingIds.has(img.id)
+      ) {
+        autoSuggestedRef.current.add(img.id);
+        // Fire-and-forget. handleResuggest manages its own state +
+        // error reporting.
+        void handleResuggest(img.id);
+      }
+    }
+  }, [images, suggestingIds, handleResuggest]);
+
+  // ---------------- end AI handlers ----------------
+
   const handleAltTextBlur = async (
     imageId: string,
     e: React.FocusEvent<HTMLInputElement>
@@ -855,9 +1315,20 @@ export function ImageUploader({
                     isDeleting={deletingIds.has(img.id)}
                     isSettingHero={settingHeroIds.has(img.id)}
                     isNewlyArrived={newlyArrivedIds.has(img.id)}
+                    isSuggesting={suggestingIds.has(img.id)}
+                    isApplyingAlt={applyingAltIds.has(img.id)}
+                    isApplyingTags={applyingTagsIds.has(img.id)}
+                    isApplyingCategories={applyingCategoriesIds.has(img.id)}
+                    categoryNameById={categoryNameById}
                     onDelete={handleDelete}
                     onSetHero={handleSetHero}
                     onAltTextBlur={handleAltTextBlur}
+                    onApplyAlt={handleApplyAlt}
+                    onApplyTags={(tags) => handleApplyTags(img.id, tags)}
+                    onApplyCategories={(cids) =>
+                      handleApplyCategories(img.id, cids)
+                    }
+                    onResuggest={handleResuggest}
                   />
                 ))}
               </div>

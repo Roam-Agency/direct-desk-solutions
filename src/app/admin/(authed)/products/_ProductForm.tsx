@@ -605,6 +605,7 @@ export default function ProductForm({
             productId={initialProduct.id}
             productName={initialProduct.name}
             initialImages={initialImages}
+            categories={allCategories}
           />
         </Section>
       )}
