@@ -45,3 +45,6 @@ next-env.d.ts
 
 # Supabase CLI local state
 supabase/.temp/
+
+# Local scratch scripts (smoke tests, one-offs)
+scripts/
