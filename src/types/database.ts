@@ -63,6 +63,8 @@ export type Database = {
       }
       product_images: {
         Row: {
+          ai_suggested_at: string | null
+          ai_suggestions: Json | null
           alt_text: string
           cloudinary_public_id: string
           cloudinary_url: string
@@ -74,6 +76,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ai_suggested_at?: string | null
+          ai_suggestions?: Json | null
           alt_text?: string
           cloudinary_public_id: string
           cloudinary_url: string
@@ -85,6 +89,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ai_suggested_at?: string | null
+          ai_suggestions?: Json | null
           alt_text?: string
           cloudinary_public_id?: string
           cloudinary_url?: string
