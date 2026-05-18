@@ -37,6 +37,10 @@ type ActionResult =
   | { ok: true; suggestion: AiSuggestion }
   | { ok: false; formError: string };
 
+type ApplyActionResult =
+  | { ok: true }
+  | { ok: false; formError: string };
+
 /**
  * The raw shape we expect back from Claude — narrower than AiSuggestion
  * because model + suggested_at are stamped server-side, not asked for.
@@ -183,3 +187,115 @@ export async function suggestImageMetadata(
   revalidatePath(`/admin/products/${image.product_id}`);
   return { ok: true, suggestion };
 }
+
+/**
+ * Apply the AI-suggested alt text to a single image.
+ *
+ * Writes only to the specific image — does not touch the product or
+ * any other images. Used by the "Apply alt" button on the suggestion strip.
+ */
+export async function applyAltToImage(
+  imageId: string,
+  alt: string
+): Promise<ApplyActionResult> {
+  if (!imageId) return { ok: false, formError: "Missing image id" };
+
+  const supabase = await createClient();
+
+  // Look up the image first so we know which product to revalidate.
+  const { data: image, error: fetchError } = await supabase
+    .from("product_images")
+    .select("product_id")
+    .eq("id", imageId)
+    .single();
+
+  if (fetchError || !image) {
+    return { ok: false, formError: "Image not found" };
+  }
+
+  const { error } = await supabase
+    .from("product_images")
+    .update({ alt_text: alt })
+    .eq("id", imageId);
+
+  if (error) return { ok: false, formError: error.message };
+
+  revalidatePath(`/admin/products/${image.product_id}`);
+  return { ok: true };
+}
+
+/**
+ * Merge AI-suggested tags into the product's tags array.
+ *
+ * Reads the current tags, dedupes against the incoming set, writes the union.
+ * Single-admin assumption holds: no concurrent writes against the same row.
+ */
+export async function applyTagsToProduct(
+  productId: string,
+  newTags: string[]
+): Promise<ApplyActionResult> {
+  if (!productId) return { ok: false, formError: "Missing product id" };
+  if (!Array.isArray(newTags) || newTags.length === 0) {
+    return { ok: true }; // nothing to merge, treat as success
+  }
+
+  const supabase = await createClient();
+
+  const { data: product, error: fetchError } = await supabase
+    .from("products")
+    .select("tags")
+    .eq("id", productId)
+    .single();
+
+  if (fetchError || !product) {
+    return { ok: false, formError: "Product not found" };
+  }
+
+  const existing = Array.isArray(product.tags) ? product.tags : [];
+  const merged = Array.from(new Set([...existing, ...newTags]));
+
+  const { error } = await supabase
+    .from("products")
+    .update({ tags: merged })
+    .eq("id", productId);
+
+  if (error) return { ok: false, formError: error.message };
+
+  revalidatePath(`/admin/products/${productId}`);
+  return { ok: true };
+}
+
+/**
+ * Merge AI-suggested categories into product_categories via upsert.
+ *
+ * Uses ignoreDuplicates so existing assignments are untouched. Symmetric
+ * with the assignCategoryToProducts action in categories/_actions.ts but
+ * scoped to one product across many categories.
+ */
+export async function applyCategoriesToProduct(
+  productId: string,
+  categoryIds: string[]
+): Promise<ApplyActionResult> {
+  if (!productId) return { ok: false, formError: "Missing product id" };
+  const unique = Array.from(new Set(categoryIds));
+  if (unique.length === 0) return { ok: true };
+
+  const supabase = await createClient();
+  const rows = unique.map((category_id) => ({
+    product_id: productId,
+    category_id,
+  }));
+
+  const { error } = await supabase
+    .from("product_categories")
+    .upsert(rows, {
+      onConflict: "product_id,category_id",
+      ignoreDuplicates: true,
+    });
+
+  if (error) return { ok: false, formError: error.message };
+
+  revalidatePath(`/admin/products/${productId}`);
+  return { ok: true };
+}
+
