@@ -7,6 +7,7 @@ import {
   addReportItem,
   updateReportItem,
   deleteReportItem,
+  importObservationsAsItems,
 } from "./_condition-actions";
 
 type ConditionReportRow =
@@ -33,6 +34,66 @@ const SEVERITY_COLOUR: Record<Severity, string> = {
   moderate: "text-orange-700 bg-orange-50 border-orange-200",
   significant: "text-red-700 bg-red-50 border-red-200",
 };
+
+
+/**
+ * Shape of a single condition observation as Claude returns it. The
+ * field is jsonb in the database, so we narrow defensively.
+ */
+type AiObservation = {
+  area: string;
+  description: string;
+  severity?: Severity;
+};
+
+/**
+ * Extract a flat list of {imageId, area, description, severity} from
+ * the array of attached images. Each image\u2019s ai_suggestions.condition_observations
+ * contributes zero-or-more rows. severity defaults to "light" if Claude
+ * didn\u2019t include one (the AI prompt asks for it but we don\u2019t require it).
+ */
+function extractObservations(
+  images: ProductImageRow[]
+): Array<{
+  imageId: string;
+  area: string;
+  description: string;
+  severity: Severity;
+}> {
+  const out: Array<{
+    imageId: string;
+    area: string;
+    description: string;
+    severity: Severity;
+  }> = [];
+  for (const img of images) {
+    const ai = img.ai_suggestions;
+    if (!ai || typeof ai !== "object") continue;
+    const obs = (ai as { condition_observations?: unknown }).condition_observations;
+    if (!Array.isArray(obs)) continue;
+    for (const o of obs) {
+      if (
+        typeof o === "object" &&
+        o !== null &&
+        typeof (o as AiObservation).area === "string" &&
+        typeof (o as AiObservation).description === "string"
+      ) {
+        const cand = o as AiObservation;
+        const sev: Severity =
+          cand.severity && SEVERITIES.includes(cand.severity)
+            ? cand.severity
+            : "light";
+        out.push({
+          imageId: img.id,
+          area: cand.area,
+          description: cand.description,
+          severity: sev,
+        });
+      }
+    }
+  }
+  return out;
+}
 
 /**
  * Condition report authoring section.
@@ -71,6 +132,104 @@ export function ConditionReportSection({
   const [addingItem, setAddingItem] = useState(false);
 
   const imageById = new Map(attachedImages.map((i) => [i.id, i]));
+
+  // ---------- AI observations import ----------
+  const aiObservations = extractObservations(attachedImages);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [perRowSeverity, setPerRowSeverity] = useState<Map<number, Severity>>(
+    () => new Map(aiObservations.map((o, i) => [i, o.severity]))
+  );
+  const [importing, setImporting] = useState(false);
+
+  function toggleSelected(index: number) {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  }
+
+  function setRowSeverity(index: number, severity: Severity) {
+    setPerRowSeverity((current) => {
+      const next = new Map(current);
+      next.set(index, severity);
+      return next;
+    });
+  }
+
+  async function handleImportSelected() {
+    if (selected.size === 0) return;
+
+    // Same as handleAddItem: create the report if absent.
+    let reportId = report?.id;
+    if (!reportId) {
+      const createResult = await upsertConditionReport(productId, {
+        summary: null,
+        grade: null,
+      });
+      if (!createResult.ok) {
+        window.alert(
+          `Could not create report: ${createResult.formError ?? "validation failed"}`
+        );
+        return;
+      }
+      reportId = createResult.data.reportId;
+      setReport({
+        id: reportId,
+        product_id: productId,
+        summary: null,
+        grade: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        published_at: null,
+      });
+    }
+
+    const payload = Array.from(selected).map((i) => {
+      const o = aiObservations[i];
+      return {
+        severity: perRowSeverity.get(i) ?? o.severity,
+        area: o.area,
+        description: o.description,
+        image_id: o.imageId,
+        sort_order: 0,
+      };
+    });
+
+    setImporting(true);
+    try {
+      const result = await importObservationsAsItems(reportId, payload);
+      if (!result.ok) {
+        window.alert(
+          `Could not import observations: ${result.formError ?? "validation failed"}`
+        );
+        return;
+      }
+      // Reflect optimistically. revalidatePath in the action gives us
+      // authoritative ids on the next nav/refresh.
+      const baseSortOrder = items.length;
+      setItems((current) => [
+        ...current,
+        ...payload.map((p, idx) => ({
+          id: `tmp-${Date.now()}-${idx}`,
+          report_id: reportId!,
+          severity: p.severity,
+          area: p.area,
+          description: p.description,
+          image_id: p.image_id,
+          sort_order: baseSortOrder + idx,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })),
+      ]);
+      // Clear selection.
+      setSelected(new Set());
+    } finally {
+      setImporting(false);
+    }
+  }
+
 
   async function saveHeader() {
     setSavingHeader(true);
@@ -361,6 +520,88 @@ export function ConditionReportSection({
           </ul>
         )}
       </div>
+
+      {aiObservations.length > 0 && (
+        <div className="border border-rule bg-paper p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-ink/60">
+              AI suggested observations
+            </h3>
+            <span className="text-[10px] uppercase tracking-widest text-ink/40">
+              {selected.size} of {aiObservations.length} selected
+            </span>
+          </div>
+          <ul className="space-y-2">
+            {aiObservations.map((o, idx) => {
+              const img = imageById.get(o.imageId);
+              const imgIndex = attachedImages.findIndex(
+                (i) => i.id === o.imageId
+              );
+              const isChecked = selected.has(idx);
+              const rowSeverity = perRowSeverity.get(idx) ?? o.severity;
+              return (
+                <li
+                  key={idx}
+                  className="flex items-start gap-3 border-t border-rule pt-2 first:border-t-0 first:pt-0"
+                >
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => toggleSelected(idx)}
+                    className="mt-1"
+                    aria-label={`Select observation: ${o.area}`}
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="font-bold text-ink">{o.area}</span>
+                      <span className="text-ink/40">
+                        \u2014 from Image #{imgIndex + 1}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-sm text-ink/80">
+                      {o.description}
+                    </p>
+                  </div>
+                  <select
+                    value={rowSeverity}
+                    onChange={(e) =>
+                      setRowSeverity(idx, e.target.value as Severity)
+                    }
+                    disabled={!isChecked}
+                    className={`border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${SEVERITY_COLOUR[rowSeverity]} disabled:opacity-40`}
+                  >
+                    {SEVERITIES.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                  {img && (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={img.cloudinary_url}
+                      alt={img.alt_text ?? ""}
+                      className="h-12 w-12 object-cover border border-rule"
+                    />
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          <div className="flex items-center justify-end gap-3 border-t border-rule pt-3">
+            <button
+              type="button"
+              onClick={handleImportSelected}
+              disabled={selected.size === 0 || importing}
+              className="bg-ink px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-paper transition hover:bg-brand-red disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {importing
+                ? "Importing\u2026"
+                : `Import selected as items \u2192`}
+            </button>
+          </div>
+        </div>
+      )}
 
       <button
         type="button"
