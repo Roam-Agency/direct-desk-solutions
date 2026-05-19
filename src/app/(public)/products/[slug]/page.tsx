@@ -3,12 +3,14 @@ import type { Metadata } from "next";
 import {
   getProductBySlug,
   getProductImages,
+  getPublishedConditionReport,
 } from "@/lib/products/fetch";
 import Breadcrumb from "../../_Breadcrumb";
 import Gallery from "./_Gallery";
 import PriceBlock from "./_PriceBlock";
 import StockBadge from "./_StockBadge";
 import TrustBullets from "./_TrustBullets";
+import StickyCTA from "./_StickyCTA";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -40,7 +42,14 @@ export default async function ProductDetailPage({ params }: PageProps) {
     notFound();
   }
 
-  const images = await getProductImages(product.id);
+  // Fetch images and condition report in parallel — both are independent
+  // reads off the product id and don't block each other.
+  const [images, conditionReport] = await Promise.all([
+    getProductImages(product.id),
+    getPublishedConditionReport(product.id),
+  ]);
+
+  const hasPublishedReport = conditionReport !== null;
 
   // Determine breadcrumb based on condition. We don't have category
   // lookup wired into v1 because category landing pages don't exist
@@ -51,87 +60,99 @@ export default async function ProductDetailPage({ params }: PageProps) {
       : { label: "Shop New", href: "/products?condition=new" };
 
   return (
-    <div className="pb-20">
-      <div className="mx-auto max-w-7xl px-6 pt-6">
-        <Breadcrumb
-          items={[
-            { label: "Home", href: "/" },
-            conditionCrumb,
-            { label: product.name },
-          ]}
+    <>
+      {/* pb-32 reserves space at the bottom so the sticky CTA bar never
+          overlaps page content at scroll end. ~128px covers single-row
+          CTA on tablet/desktop and CTA + mobile anchor link on phones. */}
+      <div className="pb-32">
+        <div className="mx-auto max-w-7xl px-6 pt-6">
+          <Breadcrumb
+            items={[
+              { label: "Home", href: "/" },
+              conditionCrumb,
+              { label: product.name },
+            ]}
+          />
+        </div>
+
+        {/* Gallery: scroll-snap carousel with anchored corner tab.
+            Per-slide pinch-zoom, progress pills, N/M counter. */}
+        <Gallery
+          images={images}
+          condition={product.condition}
+          grade={product.condition_grade}
+          productName={product.name}
         />
-      </div>
 
-      {/* Gallery: scroll-snap carousel with anchored corner tab.
-          Per-slide pinch-zoom, progress pills, N/M counter. */}
-      <Gallery
-        images={images}
-        condition={product.condition}
-        grade={product.condition_grade}
-        productName={product.name}
-      />
-
-      <div className="mx-auto max-w-7xl px-6">
-        {/* Product identity */}
-        <div className="mt-8 space-y-3">
-          {product.brand && (
-            <p className="text-[11px] uppercase tracking-[0.22em] font-bold text-ink/60">
-              {product.brand}
+        <div className="mx-auto max-w-7xl px-6">
+          {/* Product identity */}
+          <div className="mt-8 space-y-3">
+            {product.brand && (
+              <p className="text-[11px] uppercase tracking-[0.22em] font-bold text-ink/60">
+                {product.brand}
+              </p>
+            )}
+            <h1 className="font-display text-3xl sm:text-4xl tracking-tight leading-tight text-ink">
+              {product.name}
+            </h1>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-ink/40 font-mono">
+              SKU {product.sku}
             </p>
-          )}
-          <h1 className="font-display text-3xl sm:text-4xl tracking-tight leading-tight text-ink">
-            {product.name}
-          </h1>
-          <p className="text-[11px] uppercase tracking-[0.18em] text-ink/40 font-mono">
-            SKU {product.sku}
-          </p>
-        </div>
-
-        {/* Price */}
-        <div className="mt-8">
-          <PriceBlock
-            price_pence={product.price_pence}
-            was_price_pence={product.was_price_pence}
-          />
-        </div>
-
-        {/* Stock state */}
-        <div className="mt-6">
-          <StockBadge
-            stock_quantity={product.stock_quantity}
-            low_stock_alert={product.low_stock_alert}
-          />
-        </div>
-
-        {/* Trust bullets — used items only */}
-        {product.condition === "used" && (
-          <div className="mt-10">
-            <TrustBullets source={product.source} />
           </div>
-        )}
 
-        {/* Description */}
-        {product.description && (
-          <div className="mt-10">
-            <p className="text-[10px] uppercase tracking-[0.22em] font-bold text-brand-red mb-3">
-              About this {product.condition === "used" ? "piece" : "product"}
-            </p>
-            <div className="prose prose-sm max-w-none text-ink leading-relaxed whitespace-pre-line">
-              {product.description}
-            </div>
+          {/* Price */}
+          <div className="mt-8">
+            <PriceBlock
+              price_pence={product.price_pence}
+              was_price_pence={product.was_price_pence}
+            />
           </div>
-        )}
 
-        {/* Anchor target for sticky CTA's "View Condition Report" link.
-            Patch 3 will mount the actual condition report render here. */}
-        <div id="condition-report" className="mt-16 scroll-mt-20">
+          {/* Stock state */}
+          <div className="mt-6">
+            <StockBadge
+              stock_quantity={product.stock_quantity}
+              low_stock_alert={product.low_stock_alert}
+            />
+          </div>
+
+          {/* Trust bullets — used items only */}
           {product.condition === "used" && (
-            <p className="text-xs uppercase tracking-[0.22em] text-ink/40">
-              Condition report — coming next session
-            </p>
+            <div className="mt-10">
+              <TrustBullets source={product.source} />
+            </div>
           )}
+
+          {/* Description */}
+          {product.description && (
+            <div className="mt-10">
+              <p className="text-[10px] uppercase tracking-[0.22em] font-bold text-brand-red mb-3">
+                About this {product.condition === "used" ? "piece" : "product"}
+              </p>
+              <div className="prose prose-sm max-w-none text-ink leading-relaxed whitespace-pre-line">
+                {product.description}
+              </div>
+            </div>
+          )}
+
+          {/* Anchor target for sticky CTA's "View Condition Report" link.
+              Patch 3 (next PR) will mount the actual condition report render here. */}
+          <div id="condition-report" className="mt-16 scroll-mt-20">
+            {product.condition === "used" && (
+              <p className="text-xs uppercase tracking-[0.22em] text-ink/40">
+                Condition report — coming next session
+              </p>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Sticky CTA bar — rendered outside the pb-32 wrapper so it sits
+          above page content as a fixed overlay. */}
+      <StickyCTA
+        pricePence={product.price_pence}
+        hasPublishedReport={hasPublishedReport}
+      />
+    </>
   );
 }
