@@ -1,5 +1,19 @@
 import type { Metadata } from "next";
+import { Archivo, Archivo_Black } from "next/font/google";
 import "./globals.css";
+
+const archivo = Archivo({
+  subsets: ["latin"],
+  variable: "--font-archivo",
+  display: "swap",
+});
+
+const archivoBlack = Archivo_Black({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-archivo-black",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: {
@@ -36,7 +50,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en-GB">
+    <html
+      lang="en-GB"
+      className={`${archivo.variable} ${archivoBlack.variable}`}
+    >
       <body className="antialiased">{children}</body>
     </html>
   );
