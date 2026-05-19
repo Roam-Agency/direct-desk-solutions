@@ -8,6 +8,7 @@ import {
   updateReportItem,
   deleteReportItem,
   importObservationsAsItems,
+  publishConditionReport,
 } from "./_condition-actions";
 
 type ConditionReportRow =
@@ -130,6 +131,7 @@ export function ConditionReportSection({
   const [savingHeader, setSavingHeader] = useState(false);
   const [savingItem, setSavingItem] = useState<string | null>(null);
   const [addingItem, setAddingItem] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
   const imageById = new Map(attachedImages.map((i) => [i.id, i]));
 
@@ -268,6 +270,28 @@ export function ConditionReportSection({
     }
   }
 
+  async function handlePublishToggle() {
+    if (!report) {
+      window.alert(
+        "Save the report header first (add a summary or grade) before publishing."
+      );
+      return;
+    }
+    setPublishing(true);
+    try {
+      const result = await publishConditionReport(report.id);
+      if (!result.ok) {
+        window.alert(
+          `Could not change publish state: ${result.formError ?? "unknown error"}`
+        );
+        return;
+      }
+      setReport({ ...report, published_at: result.data.publishedAt });
+    } finally {
+      setPublishing(false);
+    }
+  }
+
   async function handleAddItem() {
     // Adding an item requires a report. Create one with no summary/grade
     // if needed.
@@ -380,6 +404,40 @@ export function ConditionReportSection({
 
   return (
     <div className="space-y-6">
+      {/* Publish status + toggle */}
+      <div className="flex items-center justify-between border-b border-rule pb-3">
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-ink/60">
+            Condition report
+          </span>
+          <span
+            className={`border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${
+              report?.published_at
+                ? "border-brand-red bg-brand-red text-paper"
+                : "border-rule bg-paper text-ink/60"
+            }`}
+          >
+            {report?.published_at ? "Published" : "Draft"}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={handlePublishToggle}
+          disabled={publishing || !report}
+          className={`px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-paper transition disabled:cursor-not-allowed disabled:opacity-40 ${
+            report?.published_at
+              ? "bg-brand-red hover:bg-ink"
+              : "bg-ink hover:bg-brand-red"
+          }`}
+        >
+          {publishing
+            ? "Saving…"
+            : report?.published_at
+            ? "Unpublish"
+            : "Publish report"}
+        </button>
+      </div>
+
       {/* Header: summary + grade */}
       <div className="grid gap-4 md:grid-cols-[1fr_auto]">
         <div>
