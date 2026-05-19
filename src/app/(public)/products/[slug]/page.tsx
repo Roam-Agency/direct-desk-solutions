@@ -1,12 +1,11 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import Image from "next/image";
 import {
   getProductBySlug,
   getProductImages,
 } from "@/lib/products/fetch";
 import Breadcrumb from "../../_Breadcrumb";
-import ConditionBadge from "./_ConditionBadge";
+import Gallery from "./_Gallery";
 import PriceBlock from "./_PriceBlock";
 import StockBadge from "./_StockBadge";
 import TrustBullets from "./_TrustBullets";
@@ -42,7 +41,6 @@ export default async function ProductDetailPage({ params }: PageProps) {
   }
 
   const images = await getProductImages(product.id);
-  const heroImage = images[0] ?? null;
 
   // Determine breadcrumb based on condition. We don't have category
   // lookup wired into v1 because category landing pages don't exist
@@ -64,31 +62,14 @@ export default async function ProductDetailPage({ params }: PageProps) {
         />
       </div>
 
-      {/* Gallery: Commit A renders the hero statically.
-          Commit B replaces this with a swipe carousel. */}
-      <div className="mt-6 relative aspect-square w-full bg-rule overflow-hidden">
-        <div className="absolute top-0 left-0 z-10">
-          <ConditionBadge
-            condition={product.condition}
-            grade={product.condition_grade}
-            size="md"
-          />
-        </div>
-        {heroImage ? (
-          <Image
-            src={heroImage.cloudinary_url}
-            alt={heroImage.alt_text || product.name}
-            fill
-            sizes="(max-width: 768px) 100vw, 768px"
-            priority
-            className="object-contain"
-          />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-xs uppercase tracking-[0.22em] text-ink/30">
-            No image
-          </div>
-        )}
-      </div>
+      {/* Gallery: scroll-snap carousel with anchored corner tab.
+          Per-slide pinch-zoom, progress pills, N/M counter. */}
+      <Gallery
+        images={images}
+        condition={product.condition}
+        grade={product.condition_grade}
+        productName={product.name}
+      />
 
       <div className="mx-auto max-w-7xl px-6">
         {/* Product identity */}
