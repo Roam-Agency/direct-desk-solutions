@@ -334,3 +334,51 @@ export async function importObservationsAsItems(
 
   return { ok: true, data: { inserted: rows.length } };
 }
+
+/**
+ * Toggle the publish state of a condition report.
+ *
+ * If the report's published_at is null, sets it to now().
+ * If it's already set, clears it back to null (unpublish).
+ *
+ * The buyer-side query filters on `published_at IS NOT NULL`, so this
+ * is the single switch that controls whether a report is buyer-visible.
+ *
+ * Returns the new published_at so the client can update local state
+ * without a refetch.
+ */
+export async function publishConditionReport(
+  reportId: string
+): Promise<ActionResult<{ publishedAt: string | null }>> {
+  if (!reportId) return { ok: false, formError: "Missing report id" };
+
+  const supabase = await createClient();
+
+  // Read current state so we know whether to publish or unpublish.
+  const { data: existing, error: lookupError } = await supabase
+    .from("condition_reports")
+    .select("id, product_id, published_at")
+    .eq("id", reportId)
+    .single();
+
+  if (lookupError || !existing) {
+    return { ok: false, formError: "Report not found" };
+  }
+
+  const nextPublishedAt = existing.published_at
+    ? null
+    : new Date().toISOString();
+
+  const { error } = await supabase
+    .from("condition_reports")
+    .update({ published_at: nextPublishedAt })
+    .eq("id", reportId);
+
+  if (error) return { ok: false, formError: error.message };
+
+  if (existing.product_id) {
+    revalidatePath(`/admin/products/${existing.product_id}`);
+  }
+
+  return { ok: true, data: { publishedAt: nextPublishedAt } };
+}
