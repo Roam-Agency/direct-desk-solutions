@@ -2,11 +2,11 @@ import { Metadata } from "next";
 import Breadcrumb from "@/app/(public)/_Breadcrumb";
 import ListingGrid from "../_ListingGrid";
 import SortDropdown from "../_SortDropdown";
+import { listLiveProducts } from "@/lib/products/fetch";
 import {
-  listLiveProducts,
   DEFAULT_LISTING_SORT,
   type ListingSort,
-} from "@/lib/products/fetch";
+} from "@/lib/products/listing-sort";
 
 export const metadata: Metadata = {
   title: "Used & Refurbished | Direct Desk Solutions",

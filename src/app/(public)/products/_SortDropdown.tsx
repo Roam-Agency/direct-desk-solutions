@@ -12,7 +12,7 @@
  */
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { LISTING_SORTS, type ListingSort } from "@/lib/products/fetch";
+import { LISTING_SORTS, type ListingSort } from "@/lib/products/listing-sort";
 
 export default function SortDropdown({ current }: { current: ListingSort }) {
   const router = useRouter();

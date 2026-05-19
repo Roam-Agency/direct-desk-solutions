@@ -15,6 +15,8 @@
 
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
+import type { ListingSort } from "./listing-sort";
+import { DEFAULT_LISTING_SORT as _DEFAULT_SORT } from "./listing-sort";
 
 type ProductRow = Database["public"]["Tables"]["products"]["Row"];
 type ProductImageRow = Database["public"]["Tables"]["product_images"]["Row"];
@@ -152,19 +154,16 @@ export async function getPublishedConditionReport(
 }
 
 /**
- * The accepted sort options for the public listing pages. Kept in this
- * one place so the listing page, the sort dropdown, and the fetch helper
- * all agree on what's valid.
+ * Listing sort constants live in their own module so client components
+ * can import them without pulling in the Supabase server client (which
+ * uses next/headers and breaks client bundles). Re-export here so
+ * server callers can import the helper + type from one place.
  */
-export type ListingSort = "price-asc" | "price-desc" | "newest";
-
-export const LISTING_SORTS: { value: ListingSort; label: string }[] = [
-  { value: "price-asc", label: "Price: Low to High" },
-  { value: "price-desc", label: "Price: High to Low" },
-  { value: "newest", label: "Newest First" },
-];
-
-export const DEFAULT_LISTING_SORT: ListingSort = "price-asc";
+export type { ListingSort } from "./listing-sort";
+export {
+  LISTING_SORTS,
+  DEFAULT_LISTING_SORT,
+} from "./listing-sort";
 
 /**
  * The card-shaped projection returned by listLiveProducts.
@@ -192,7 +191,7 @@ export async function listLiveProducts(opts: {
   sortBy?: ListingSort;
 }): Promise<ProductCard[]> {
   const supabase = await createClient();
-  const sortBy = opts.sortBy ?? DEFAULT_LISTING_SORT;
+  const sortBy = opts.sortBy ?? _DEFAULT_SORT;
 
   // Pull the hero image inline via a nested select. Filter to is_hero=true
   // on the join so we only get the one row per product. Supabase returns
