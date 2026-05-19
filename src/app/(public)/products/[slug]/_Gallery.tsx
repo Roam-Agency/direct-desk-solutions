@@ -38,7 +38,7 @@ interface GalleryProps {
   productName: string;
 }
 
-export function Gallery({
+export default function Gallery({
   images,
   condition,
   grade,
