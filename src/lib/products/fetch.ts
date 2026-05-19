@@ -15,6 +15,8 @@
 
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/types/database";
+import type { ListingSort } from "./listing-sort";
+import { DEFAULT_LISTING_SORT as _DEFAULT_SORT } from "./listing-sort";
 
 type ProductRow = Database["public"]["Tables"]["products"]["Row"];
 type ProductImageRow = Database["public"]["Tables"]["product_images"]["Row"];
@@ -149,4 +151,158 @@ export async function getPublishedConditionReport(
     .sort((a, b) => a.sort_order - b.sort_order);
 
   return { report, items };
+}
+
+/**
+ * Listing sort constants live in their own module so client components
+ * can import them without pulling in the Supabase server client (which
+ * uses next/headers and breaks client bundles). Re-export here so
+ * server callers can import the helper + type from one place.
+ */
+export type { ListingSort } from "./listing-sort";
+export {
+  LISTING_SORTS,
+  DEFAULT_LISTING_SORT,
+} from "./listing-sort";
+
+/**
+ * The card-shaped projection returned by listLiveProducts.
+ *
+ * Includes the bare product row plus the hero image's URL + alt — both
+ * the listing card needs, neither requires a second query per row.
+ */
+export type ProductCard = ProductRow & {
+  hero_image_url: string | null;
+  hero_image_alt: string | null;
+};
+
+/**
+ * List all live products of a given condition, with their hero image
+ * URL attached for the listing card render.
+ *
+ * Returns an empty array if nothing matches. RLS hides draft/archived
+ * rows automatically; the explicit .eq("status", "live") is belt-and-
+ * braces and also makes the SQL plan obvious.
+ *
+ * Sort is server-side and uses the listing's canonical sort values.
+ */
+export async function listLiveProducts(opts: {
+  condition: "new" | "used";
+  sortBy?: ListingSort;
+}): Promise<ProductCard[]> {
+  const supabase = await createClient();
+  const sortBy = opts.sortBy ?? _DEFAULT_SORT;
+
+  // Pull the hero image inline via a nested select. Filter to is_hero=true
+  // on the join so we only get the one row per product. Supabase returns
+  // it as an array (joins always are), so we flatten in the map below.
+  const query = supabase
+    .from("products")
+    .select(
+      `
+      *,
+      hero:product_images!inner (
+        cloudinary_url,
+        alt_text,
+        is_hero
+      )
+      `
+    )
+    .eq("status", "live")
+    .eq("condition", opts.condition)
+    .eq("hero.is_hero", true);
+
+  // Apply sort
+  if (sortBy === "price-asc") {
+    query.order("price_pence", { ascending: true });
+  } else if (sortBy === "price-desc") {
+    query.order("price_pence", { ascending: false });
+  } else {
+    query.order("published_at", { ascending: false, nullsFirst: false });
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("listLiveProducts error", { opts, error });
+    return [];
+  }
+
+  // Also fetch products that have no hero image (the !inner join above
+  // excludes them). We want them visible in the listing — just without
+  // the hero — so they don't silently disappear from the shop.
+  const productsWithHero = (data ?? []).map((row) => {
+    // `hero` is always an array from the nested select. Take the first
+    // (and only, since we filtered to is_hero=true) entry.
+    const heroArr = (row as unknown as { hero: { cloudinary_url: string; alt_text: string | null }[] }).hero;
+    const hero = heroArr && heroArr.length > 0 ? heroArr[0] : null;
+    const { hero: _omit, ...product } = row as ProductRow & { hero: unknown };
+    return {
+      ...(product as ProductRow),
+      hero_image_url: hero?.cloudinary_url ?? null,
+      hero_image_alt: hero?.alt_text ?? null,
+    };
+  });
+
+  // Now fetch products with no images at all (left out by inner join)
+  const productsWithHeroIds = new Set(productsWithHero.map((p) => p.id));
+  const { data: allLive } = await supabase
+    .from("products")
+    .select("*")
+    .eq("status", "live")
+    .eq("condition", opts.condition);
+
+  const heroless = (allLive ?? [])
+    .filter((p) => !productsWithHeroIds.has(p.id))
+    .map((p) => ({
+      ...p,
+      hero_image_url: null,
+      hero_image_alt: null,
+    }));
+
+  // Combine and re-sort (the heroless products came in unordered)
+  const combined: ProductCard[] = [...productsWithHero, ...heroless];
+
+  if (sortBy === "price-asc") {
+    combined.sort((a, b) => a.price_pence - b.price_pence);
+  } else if (sortBy === "price-desc") {
+    combined.sort((a, b) => b.price_pence - a.price_pence);
+  } else {
+    combined.sort((a, b) => {
+      const aDate = a.published_at ?? a.created_at;
+      const bDate = b.published_at ?? b.created_at;
+      return bDate.localeCompare(aDate);
+    });
+  }
+
+  return combined;
+}
+
+/**
+ * Count live products by condition. Used by the /products split landing
+ * page to show "X new / Y used" hint text on each tile.
+ */
+export async function countLiveProductsByCondition(): Promise<{
+  new: number;
+  used: number;
+}> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("products")
+    .select("condition")
+    .eq("status", "live");
+
+  if (error) {
+    console.error("countLiveProductsByCondition error", { error });
+    return { new: 0, used: 0 };
+  }
+
+  const counts = { new: 0, used: 0 };
+  for (const row of data ?? []) {
+    if (row.condition === "new") counts.new += 1;
+    else if (row.condition === "used") counts.used += 1;
+  }
+
+  return counts;
 }
