@@ -11,6 +11,7 @@ import PriceBlock from "./_PriceBlock";
 import StockBadge from "./_StockBadge";
 import TrustBullets from "./_TrustBullets";
 import StickyCTA from "./_StickyCTA";
+import ConditionReport from "./_ConditionReport";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -135,13 +136,17 @@ export default async function ProductDetailPage({ params }: PageProps) {
             </div>
           )}
 
-          {/* Anchor target for sticky CTA's "View Condition Report" link.
-              Patch 3 (next PR) will mount the actual condition report render here. */}
+          {/* Condition report — only when a published report exists for
+              this product. Anchor target for the sticky CTA's "View
+              Condition Report" link. scroll-mt-20 offsets the sticky
+              header so the anchor scroll doesn't land under it. */}
           <div id="condition-report" className="mt-16 scroll-mt-20">
-            {product.condition === "used" && (
-              <p className="text-xs uppercase tracking-[0.22em] text-ink/40">
-                Condition report — coming next session
-              </p>
+            {conditionReport && (
+              <ConditionReport
+                report={conditionReport}
+                productCondition={product.condition}
+                productName={product.name}
+              />
             )}
           </div>
         </div>
