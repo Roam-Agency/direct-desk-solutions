@@ -58,6 +58,28 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
   const { data: products, error } = await query;
 
+  // Fetch hero images for the visible product set so the IMAGE column
+  // can render real thumbnails. One additional round-trip; small N
+  // because the page is admin-only and the catalogue is small.
+  const productIds = (products ?? []).map((p) => p.id);
+  const heroByProductId = new Map<
+    string,
+    { url: string; alt: string | null }
+  >();
+  if (productIds.length > 0) {
+    const { data: heroes } = await supabase
+      .from("product_images")
+      .select("product_id, cloudinary_url, alt_text")
+      .in("product_id", productIds)
+      .eq("is_hero", true);
+    for (const row of heroes ?? []) {
+      heroByProductId.set(row.product_id, {
+        url: row.cloudinary_url,
+        alt: row.alt_text,
+      });
+    }
+  }
+
   return (
     <div>
       <div className="flex items-end justify-between border-b border-rule pb-6">
@@ -109,7 +131,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         ) : !products || products.length === 0 ? (
           <EmptyState />
         ) : (
-          <ProductTable rows={products} />
+          <ProductTable rows={products} heroByProductId={heroByProductId} />
         )}
       </div>
     </div>
@@ -154,7 +176,13 @@ function Tabs({
   );
 }
 
-function ProductTable({ rows }: { rows: ProductRow[] }) {
+function ProductTable({
+  rows,
+  heroByProductId,
+}: {
+  rows: ProductRow[];
+  heroByProductId: Map<string, { url: string; alt: string | null }>;
+}) {
   return (
     <div className="overflow-hidden border border-rule">
       <table className="w-full">
@@ -171,13 +199,15 @@ function ProductTable({ rows }: { rows: ProductRow[] }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
+          {rows.map((row) => {
+            const hero = heroByProductId.get(row.id) ?? null;
+            return (
             <tr
               key={row.id}
               className="border-t border-rule transition hover:bg-rule/30"
             >
               <Td>
-                <ProductThumbnailPlaceholder />
+                <ProductThumbnail hero={hero} productName={row.name} />
               </Td>
               <Td>
                 <Link
@@ -210,7 +240,8 @@ function ProductTable({ rows }: { rows: ProductRow[] }) {
                 <StatusLabel status={row.status} />
               </Td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -244,13 +275,46 @@ function Td({
 }
 
 /**
- * Placeholder for product thumbnail. The image upload pipeline lands in
- * the next sub-phase; this stub keeps the table layout honest in the
- * meantime so we are not redesigning the row when images arrive.
+ * Insert a Cloudinary URL transform so the admin list only downloads a
+ * 96x96 thumbnail (2x for retina) instead of the full hero. Falls
+ * through to the original URL untransformed if the pattern doesn't
+ * match — defensive, should always match for our own uploads.
  */
-function ProductThumbnailPlaceholder() {
+function toThumbUrl(url: string): string {
+  return url.replace(
+    "/upload/",
+    "/upload/c_fill,w_96,h_96,q_auto,f_auto/"
+  );
+}
+
+/**
+ * Renders the product's hero image as a 48x48 admin-list thumbnail.
+ * Falls back to a placeholder rectangle when a product has no hero
+ * (drafts, freshly created, or anything in the legacy state before
+ * heroes were assigned).
+ */
+function ProductThumbnail({
+  hero,
+  productName,
+}: {
+  hero: { url: string; alt: string | null } | null;
+  productName: string;
+}) {
+  if (!hero) {
+    return (
+      <div className="h-12 w-12 border border-rule bg-rule/40" aria-hidden />
+    );
+  }
   return (
-    <div className="h-12 w-12 border border-rule bg-rule/40" aria-hidden />
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img
+      src={toThumbUrl(hero.url)}
+      alt={hero.alt ?? productName}
+      width={48}
+      height={48}
+      className="h-12 w-12 border border-rule object-cover"
+      loading="lazy"
+    />
   );
 }
 
