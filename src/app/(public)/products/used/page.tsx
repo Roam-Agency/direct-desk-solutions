@@ -32,7 +32,7 @@ export default async function UsedProductsPage({
   const products = await listLiveProducts({ condition: "used", sortBy: sort });
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8 sm:py-12">
+    <div className="mx-auto max-w-7xl px-6 py-8 sm:py-12 lg:py-16">
       <Breadcrumb
         items={[
           { label: "Home", href: "/" },

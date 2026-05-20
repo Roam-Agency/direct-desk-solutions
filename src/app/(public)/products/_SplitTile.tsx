@@ -29,7 +29,7 @@ export default function SplitTile({
   return (
     <Link
       href={href}
-      className="group block relative bg-ink text-paper p-8 sm:p-10 lg:p-12 min-h-[260px] sm:min-h-[320px] focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-paper"
+      className="group block relative bg-ink text-paper p-8 sm:p-10 lg:p-12 min-h-[260px] sm:min-h-[320px] lg:min-h-[420px] focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-paper"
     >
       {accent === "red" && (
         <div className="absolute top-0 right-0 bg-brand-red px-3 py-1.5">
