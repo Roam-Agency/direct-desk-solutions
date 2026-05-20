@@ -96,7 +96,7 @@ export default function ConditionReport({
           {itemNoun}
         </h3>
         <span
-          className="text-[11px] uppercase tracking-[0.22em] text-ink/40 tabular-nums"
+          className="text-[11px] uppercase tracking-[0.22em] text-ink/70 tabular-nums"
           aria-label={`${itemCount} ${itemNoun.toLowerCase()} noted`}
         >
           · {itemCount}
@@ -133,7 +133,7 @@ export default function ConditionReport({
                   </p>
                 )}
                 <p
-                  className="text-[10px] uppercase tracking-[0.18em] text-ink/30 tabular-nums mt-0.5"
+                  className="text-[10px] uppercase tracking-[0.18em] text-ink/30 tabular-nums mt-2"
                   aria-label={`Item ${index + 1} of ${itemCount}`}
                 >
                   {String(index + 1).padStart(2, "0")} /{" "}
