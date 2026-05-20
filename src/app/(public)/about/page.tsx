@@ -5,6 +5,27 @@ export const metadata: Metadata = {
   title: "About | Direct Desk Solutions",
   description:
     "Direct Desk Solutions Ltd — a Darlington-based office furniture company supplying new stock and curated, refurbished premium pre-owned items UK-wide.",
+  openGraph: {
+    title: "About | Direct Desk Solutions",
+    description:
+      "Direct Desk Solutions Ltd — a Darlington-based office furniture company supplying new stock and curated, refurbished premium pre-owned items UK-wide.",
+    type: "website",
+    images: [
+      {
+        url: "/og-default.png",
+        width: 1200,
+        height: 630,
+        alt: "Direct Desk Solutions",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "About | Direct Desk Solutions",
+    description:
+      "Direct Desk Solutions Ltd — a Darlington-based office furniture company supplying new stock and curated, refurbished premium pre-owned items UK-wide.",
+    images: ["/og-default.png"],
+  },
 };
 
 export default function AboutPage() {

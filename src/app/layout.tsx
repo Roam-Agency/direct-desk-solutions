@@ -22,21 +22,37 @@ export const metadata: Metadata = {
   },
   description:
     "A smarter source for office furniture. New and pre-owned desks, chairs, storage, and more — delivered across the UK. Price match guarantee, free UK mainland delivery on orders over £500.",
-  metadataBase: new URL("https://directdesksolutions.com"),
+  // Migration note: when the old WooCommerce site at
+  // directdesksolutions.com is taken down and the domain re-pointed
+  // at this Netlify deploy, set NEXT_PUBLIC_SITE_URL on Netlify to
+  // "https://directdesksolutions.com" and redeploy. No code change
+  // needed — sitemap.ts, robots.ts, and all metadata URLs follow.
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ??
+      "https://direct-desk-solutionse.netlify.app",
+  ),
   openGraph: {
     title: "Direct Desk Solutions",
     description:
       "New and pre-owned office furniture, delivered across the UK.",
-    url: "https://directdesksolutions.com",
     siteName: "Direct Desk Solutions",
     locale: "en_GB",
     type: "website",
+    images: [
+      {
+        url: "/og-default.png",
+        width: 1200,
+        height: 630,
+        alt: "Direct Desk Solutions — office furniture, honestly described.",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Direct Desk Solutions",
     description:
       "New and pre-owned office furniture, delivered across the UK.",
+    images: ["/og-default.png"],
   },
   robots: {
     index: true,
