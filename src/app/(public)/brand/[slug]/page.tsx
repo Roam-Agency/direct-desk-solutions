@@ -3,11 +3,16 @@ import { notFound } from "next/navigation";
 import Breadcrumb from "@/app/(public)/_Breadcrumb";
 import ListingGrid from "@/app/(public)/products/_ListingGrid";
 import SortDropdown from "@/app/(public)/products/_SortDropdown";
+import FilterChips from "@/app/(public)/products/_FilterChips";
 import { listLiveProductsByBrandSlug } from "@/lib/products/fetch";
 import {
   DEFAULT_LISTING_SORT,
   type ListingSort,
 } from "@/lib/products/listing-sort";
+import {
+  parseConditionFilter,
+  CONDITION_FILTERS,
+} from "@/lib/products/listing-filters";
 
 const VALID_SORTS: ListingSort[] = ["price-asc", "price-desc", "newest"];
 
@@ -44,15 +49,17 @@ export default async function BrandLandingPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ sort?: string }>;
+  searchParams: Promise<{ sort?: string; condition?: string }>;
 }) {
   const { slug } = await params;
   const sp = await searchParams;
   const sort = parseSort(sp.sort);
+  const condition = parseConditionFilter(sp.condition);
 
   const result = await listLiveProductsByBrandSlug({
     brandSlug: slug,
     sortBy: sort,
+    condition: condition === "all" ? undefined : condition,
   });
 
   // No active brand category at this slug — 404.
@@ -61,6 +68,10 @@ export default async function BrandLandingPage({
   }
 
   const { brand, products } = result;
+
+  // Filter the CONDITION_FILTERS to drop the implicit "all" — selected=null
+  // already represents "all", so showing it as a chip is redundant noise.
+  const conditionOptions = CONDITION_FILTERS.filter((c) => c.value !== "all");
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-8 sm:py-12 lg:py-16">
@@ -82,6 +93,14 @@ export default async function BrandLandingPage({
           {brand.name}
         </h1>
       </header>
+
+      <div className="mb-4 sm:mb-6">
+        <FilterChips
+          mode="condition"
+          options={conditionOptions}
+          selected={condition === "all" ? null : condition}
+        />
+      </div>
 
       <div className="flex items-center justify-between mb-6 sm:mb-8 pb-4 border-b border-rule">
         <p className="text-[10px] uppercase tracking-[0.22em] font-bold text-ink/60">

@@ -240,9 +240,32 @@ export async function attachHeroImagesToProducts(
 export async function listLiveProducts(opts: {
   condition: "new" | "used";
   sortBy?: ListingSort;
+  brandSlugs?: string[];
 }): Promise<ProductCard[]> {
   const supabase = await createClient();
   const sortBy = opts.sortBy ?? _DEFAULT_SORT;
+
+  // If brandSlugs is non-empty, resolve to product IDs joined to those
+  // brand categories. Two-query approach mirrors listLiveProductsByBrandSlug:
+  // categories(slug) -> category_ids -> product_categories(product_ids).
+  // Returns [] if no brand matches — the listing then renders empty.
+  let allowedProductIds: string[] | null = null;
+  if (opts.brandSlugs && opts.brandSlugs.length > 0) {
+    const { data: cats } = await supabase
+      .from("categories")
+      .select("id")
+      .eq("kind", "brand")
+      .eq("is_active", true)
+      .in("slug", opts.brandSlugs);
+    const catIds = (cats ?? []).map((c) => c.id);
+    if (catIds.length === 0) return [];
+    const { data: joins } = await supabase
+      .from("product_categories")
+      .select("product_id")
+      .in("category_id", catIds);
+    allowedProductIds = (joins ?? []).map((j) => j.product_id);
+    if (allowedProductIds.length === 0) return [];
+  }
 
   // Pull the hero image inline via a nested select. Filter to is_hero=true
   // on the join so we only get the one row per product. Supabase returns
@@ -262,6 +285,10 @@ export async function listLiveProducts(opts: {
     .eq("status", "live")
     .eq("condition", opts.condition)
     .eq("hero.is_hero", true);
+
+  if (allowedProductIds !== null) {
+    query.in("id", allowedProductIds);
+  }
 
   // Apply sort
   if (sortBy === "price-asc") {
@@ -297,11 +324,15 @@ export async function listLiveProducts(opts: {
 
   // Now fetch products with no images at all (left out by inner join)
   const productsWithHeroIds = new Set(productsWithHero.map((p) => p.id));
-  const { data: allLive } = await supabase
+  const allLiveQuery = supabase
     .from("products")
     .select("*")
     .eq("status", "live")
     .eq("condition", opts.condition);
+  if (allowedProductIds !== null) {
+    allLiveQuery.in("id", allowedProductIds);
+  }
+  const { data: allLive } = await allLiveQuery;
 
   const heroless = (allLive ?? [])
     .filter((p) => !productsWithHeroIds.has(p.id))
@@ -352,6 +383,7 @@ export async function listLiveProducts(opts: {
 export async function searchProducts(opts: {
   query: string;
   sortBy?: ListingSort;
+  brandSlugs?: string[];
 }): Promise<ProductCard[]> {
   const trimmed = opts.query.trim().slice(0, 100);
   if (trimmed.length === 0) return [];
@@ -363,11 +395,34 @@ export async function searchProducts(opts: {
   const supabase = await createClient();
   const sortBy = opts.sortBy ?? _DEFAULT_SORT;
 
+  // Resolve brand filter to product IDs (same pattern as listLiveProducts).
+  let allowedProductIds: string[] | null = null;
+  if (opts.brandSlugs && opts.brandSlugs.length > 0) {
+    const { data: cats } = await supabase
+      .from("categories")
+      .select("id")
+      .eq("kind", "brand")
+      .eq("is_active", true)
+      .in("slug", opts.brandSlugs);
+    const catIds = (cats ?? []).map((c) => c.id);
+    if (catIds.length === 0) return [];
+    const { data: joins } = await supabase
+      .from("product_categories")
+      .select("product_id")
+      .in("category_id", catIds);
+    allowedProductIds = (joins ?? []).map((j) => j.product_id);
+    if (allowedProductIds.length === 0) return [];
+  }
+
   const query = supabase
     .from("products")
     .select("*")
     .eq("status", "live")
     .or(`name.ilike.${pattern},description.ilike.${pattern}`);
+
+  if (allowedProductIds !== null) {
+    query.in("id", allowedProductIds);
+  }
 
   if (sortBy === "price-asc") {
     query.order("price_pence", { ascending: true });
@@ -518,6 +573,7 @@ export type BrandWithProducts = {
 export async function listLiveProductsByBrandSlug(opts: {
   brandSlug: string;
   sortBy?: ListingSort;
+  condition?: "new" | "used";
 }): Promise<BrandWithProducts | null> {
   const supabase = await createClient();
   const sortBy = opts.sortBy ?? _DEFAULT_SORT;
@@ -570,6 +626,10 @@ export async function listLiveProductsByBrandSlug(opts: {
     .select("*")
     .in("id", productIds)
     .eq("status", "live");
+
+  if (opts.condition) {
+    query.eq("condition", opts.condition);
+  }
 
   if (sortBy === "price-asc") {
     query.order("price_pence", { ascending: true });

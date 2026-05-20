@@ -2,11 +2,16 @@ import { Metadata } from "next";
 import Breadcrumb from "@/app/(public)/_Breadcrumb";
 import ListingGrid from "../_ListingGrid";
 import SortDropdown from "../_SortDropdown";
-import { listLiveProducts } from "@/lib/products/fetch";
+import FilterChips from "../_FilterChips";
+import {
+  listLiveProducts,
+  listBrandsWithCounts,
+} from "@/lib/products/fetch";
 import {
   DEFAULT_LISTING_SORT,
   type ListingSort,
 } from "@/lib/products/listing-sort";
+import { parseBrandSlugs } from "@/lib/products/listing-filters";
 
 export const metadata: Metadata = {
   title: "Used & Refurbished | Direct Desk Solutions",
@@ -25,11 +30,18 @@ function parseSort(raw: string | string[] | undefined): ListingSort {
 export default async function UsedProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sort?: string }>;
+  searchParams: Promise<{ sort?: string; brands?: string }>;
 }) {
   const sp = await searchParams;
   const sort = parseSort(sp.sort);
-  const products = await listLiveProducts({ condition: "used", sortBy: sort });
+  const brandSlugs = parseBrandSlugs(sp.brands);
+
+  const [products, brands] = await Promise.all([
+    listLiveProducts({ condition: "used", sortBy: sort, brandSlugs }),
+    listBrandsWithCounts(),
+  ]);
+
+  const brandOptions = brands.map((b) => ({ value: b.slug, label: b.name }));
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-8 sm:py-12 lg:py-16">
@@ -50,6 +62,16 @@ export default async function UsedProductsPage({
         </p>
       </header>
 
+      {brandOptions.length > 0 && (
+        <div className="mb-4 sm:mb-6">
+          <FilterChips
+            mode="brand"
+            options={brandOptions}
+            selected={brandSlugs}
+          />
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-6 sm:mb-8 pb-4 border-b border-rule">
         <p className="text-[10px] uppercase tracking-[0.22em] font-bold text-ink/60">
           {products.length} {products.length === 1 ? "item" : "items"}
@@ -59,7 +81,11 @@ export default async function UsedProductsPage({
 
       <ListingGrid
         products={products}
-        emptyMessage="No used stock right now — check back soon"
+        emptyMessage={
+          brandSlugs.length > 0
+            ? "No used stock matches those filters — try clearing them"
+            : "No used stock right now — check back soon"
+        }
       />
     </div>
   );
