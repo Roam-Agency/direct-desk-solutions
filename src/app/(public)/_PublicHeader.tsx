@@ -44,13 +44,30 @@ export default function PublicHeader() {
           <Link href="/" aria-label="Direct Desk Solutions home" className="block">
             <Logo size={28} variant="dark" />
           </Link>
+          {/* Desktop horizontal nav at lg+. Hidden below. */}
+          <nav
+            aria-label="Primary"
+            className="hidden lg:flex items-center gap-10"
+          >
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="text-[11px] uppercase tracking-[0.22em] font-bold text-ink hover:text-brand-red transition-colors"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+
+          {/* Hamburger — mobile + tablet only */}
           <button
             type="button"
             onClick={() => setOpen(true)}
             aria-label="Open menu"
             aria-expanded={open}
             aria-controls="public-mobile-menu"
-            className="flex flex-col gap-[5px] p-2 -mr-2 hover:opacity-70 transition-opacity"
+            className="lg:hidden flex flex-col gap-[5px] p-2 -mr-2 hover:opacity-70 transition-opacity"
           >
             <span className="block w-6 h-[2px] bg-ink" />
             <span className="block w-6 h-[2px] bg-ink" />

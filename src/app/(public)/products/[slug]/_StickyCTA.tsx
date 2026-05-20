@@ -22,15 +22,51 @@ import { formatPence } from "@/lib/products/format";
  * Top hairline rule separates from page content above.
  */
 
+type Variant = "mobile-sticky" | "desktop-inline";
+
 type Props = {
   pricePence: number;
   hasPublishedReport: boolean;
+  variant?: Variant;
 };
 
-export default function StickyCTA({ pricePence, hasPublishedReport }: Props) {
+export default function StickyCTA({
+  pricePence,
+  hasPublishedReport,
+  variant = "mobile-sticky",
+}: Props) {
+  // Desktop-inline variant: renders the primary CTA in-flow inside the
+  // product info column. No fixed positioning, no top hairline, no
+  // backdrop blur. The condition report link is omitted because the
+  // report itself is visible further down the same page.
+  if (variant === "desktop-inline") {
+    return (
+      <button
+        type="button"
+        disabled
+        aria-disabled="true"
+        aria-label={`Add to basket for ${formatPence(pricePence)} — basket coming soon`}
+        className="w-full flex items-center justify-center gap-3 bg-brand-red/85 text-paper py-4 px-5 cursor-not-allowed select-none"
+      >
+        <span className="text-[11px] uppercase tracking-[0.22em] font-bold">
+          Add to basket
+        </span>
+        <span className="text-paper/40" aria-hidden="true">
+          ·
+        </span>
+        <span className="font-display text-base tabular-nums">
+          {formatPence(pricePence)}
+        </span>
+      </button>
+    );
+  }
+
+  // Mobile-sticky variant (default): fixed bottom bar with safe-area
+  // padding and an optional secondary anchor link to the condition
+  // report. Hidden at lg+ so it doesn't overlap the desktop inline CTA.
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-rule bg-paper/95 backdrop-blur-sm"
+      className="lg:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-rule bg-paper/95 backdrop-blur-sm"
       style={{
         paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))",
       }}
