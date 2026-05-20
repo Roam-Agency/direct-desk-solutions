@@ -6,7 +6,7 @@ import Link from "next/link";
  * The big "Shop New" / "Shop Used" entry tiles used on the /products
  * landing page (and, in Session 5, on the homepage). Black-paper tiles
  * with optional red accent strip — design language sets up the buyer
- * for the badged corner tabs they\u2019ll see on listing cards.
+ * for the badged corner tabs they’ll see on listing cards.
  *
  * Designed to scale: stacks on mobile, sits side-by-side from sm+.
  */
@@ -54,7 +54,7 @@ export default function SplitTile({
           {count} {count === 1 ? "item" : "items"}
         </span>
         <span className="text-xs uppercase tracking-[0.18em] font-bold border-b-2 border-paper pb-1 group-hover:opacity-70 transition-opacity">
-          Shop \u2192
+          Shop →
         </span>
       </div>
     </Link>

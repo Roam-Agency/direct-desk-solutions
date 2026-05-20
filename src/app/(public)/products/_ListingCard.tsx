@@ -34,7 +34,7 @@ export default function ListingCard({ product }: { product: ProductCardData }) {
   const isUsed = product.condition === "used";
   const badgeText = isUsed
     ? product.condition_grade
-      ? `USED \u00B7 ${product.condition_grade}`
+      ? `USED · ${product.condition_grade}`
       : "USED"
     : "NEW";
 

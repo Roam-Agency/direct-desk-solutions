@@ -92,7 +92,7 @@ export default async function BrandLandingPage({
 
       <ListingGrid
         products={products}
-        emptyMessage={`No ${brand.name} stock right now \u2014 check back soon`}
+        emptyMessage={`No ${brand.name} stock right now — check back soon`}
       />
     </div>
   );

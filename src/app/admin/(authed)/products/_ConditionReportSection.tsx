@@ -49,9 +49,9 @@ type AiObservation = {
 
 /**
  * Extract a flat list of {imageId, area, description, severity} from
- * the array of attached images. Each image\u2019s ai_suggestions.condition_observations
+ * the array of attached images. Each image’s ai_suggestions.condition_observations
  * contributes zero-or-more rows. severity defaults to "light" if Claude
- * didn\u2019t include one (the AI prompt asks for it but we don\u2019t require it).
+ * didn’t include one (the AI prompt asks for it but we don’t require it).
  */
 function extractObservations(
   images: ProductImageRow[]
@@ -449,7 +449,7 @@ export function ConditionReportSection({
             onChange={(e) => setSummary(e.target.value)}
             onBlur={saveHeader}
             rows={3}
-            placeholder="A one-paragraph overview of the item\u2019s overall condition. Buyers see this first."
+            placeholder="A one-paragraph overview of the item’s overall condition. Buyers see this first."
             className="mt-1 w-full border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink/30 focus:border-ink focus:outline-none"
           />
         </div>
@@ -464,13 +464,13 @@ export function ConditionReportSection({
             className="mt-1 border border-rule bg-paper px-3 py-2 text-sm text-ink focus:border-ink focus:outline-none"
           >
             <option value="">Not graded</option>
-            <option value="A">A \u2013 Excellent</option>
-            <option value="B">B \u2013 Good</option>
-            <option value="C">C \u2013 Fair</option>
+            <option value="A">A – Excellent</option>
+            <option value="B">B – Good</option>
+            <option value="C">C – Fair</option>
           </select>
           {savingHeader && (
             <p className="mt-1 text-[10px] uppercase tracking-widest text-ink/40">
-              Saving\u2026
+              Saving…
             </p>
           )}
         </div>
@@ -546,14 +546,14 @@ export function ConditionReportSection({
                     <option value="">No linked image</option>
                     {attachedImages.map((img, idx) => (
                       <option key={img.id} value={img.id}>
-                        Image #{idx + 1} {img.alt_text ? `\u2014 ${img.alt_text}` : ""}
+                        Image #{idx + 1} {img.alt_text ? `— ${img.alt_text}` : ""}
                       </option>
                     ))}
                   </select>
                   <div className="flex items-center gap-2">
                     {savingItem === item.id && (
                       <span className="text-[10px] uppercase tracking-widest text-ink/40">
-                        Saving\u2026
+                        Saving…
                       </span>
                     )}
                     <button
@@ -613,7 +613,7 @@ export function ConditionReportSection({
                     <div className="flex items-center gap-2 text-xs">
                       <span className="font-bold text-ink">{o.area}</span>
                       <span className="text-ink/40">
-                        \u2014 from Image #{imgIndex + 1}
+                        — from Image #{imgIndex + 1}
                       </span>
                     </div>
                     <p className="mt-0.5 text-sm text-ink/80">
@@ -654,8 +654,8 @@ export function ConditionReportSection({
               className="bg-ink px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-paper transition hover:bg-brand-red disabled:cursor-not-allowed disabled:opacity-40"
             >
               {importing
-                ? "Importing\u2026"
-                : `Import selected as items \u2192`}
+                ? "Importing…"
+                : `Import selected as items →`}
             </button>
           </div>
         </div>
@@ -667,7 +667,7 @@ export function ConditionReportSection({
         disabled={addingItem}
         className="w-full border border-dashed border-rule bg-transparent py-2 text-xs font-bold uppercase tracking-widest text-ink/60 transition hover:border-ink hover:text-ink disabled:cursor-wait disabled:opacity-50"
       >
-        {addingItem ? "Adding\u2026" : "+ Add observation"}
+        {addingItem ? "Adding…" : "+ Add observation"}
       </button>
     </div>
   );
