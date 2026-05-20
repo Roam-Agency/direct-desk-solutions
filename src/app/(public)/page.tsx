@@ -154,7 +154,7 @@ export default async function PublicHomePage() {
             <div>
               <div className="h-0.5 w-10 bg-brand-red mb-5" aria-hidden="true" />
               <h3 className="text-lg font-black tracking-tight mb-3">
-                12-month warranty
+                3-month warranty
               </h3>
               <p className="text-sm text-ink/70 leading-relaxed">
                 Standard on all stock, new and used. Returns accepted within 14 days. UK delivery on every order.
