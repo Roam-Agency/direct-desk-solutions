@@ -17,6 +17,10 @@
   --color-rule: var(--rule);
   --font-sans: var(--font-archivo), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-display: var(--font-archivo-black), var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  /* Ultra-wide drift fix: max-w-7xl stays 80rem on normal screens,
+     grows with viewport above ~1707px, caps at 92rem so content
+     never sprawls past comfortable reading width on 4K monitors. */
+  --container-7xl: clamp(80rem, 75vw, 92rem);
 }
 
 html {
