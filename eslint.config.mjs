@@ -13,6 +13,24 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  // Respect the underscore-prefix convention for intentionally-unused
+  // identifiers. Variables, function args, and destructured array members
+  // whose name starts with `_` are silently ignored by the unused-vars
+  // rule. This matches the JavaScript convention and TypeScript's own
+  // tsconfig `noUnusedParameters` exemption pattern.
+  {
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          destructuredArrayIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;
