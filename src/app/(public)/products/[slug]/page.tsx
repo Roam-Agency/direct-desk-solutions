@@ -12,6 +12,7 @@ import StockBadge from "./_StockBadge";
 import TrustBullets from "./_TrustBullets";
 import StickyCTA from "./_StickyCTA";
 import ConditionReport from "./_ConditionReport";
+import ProductJsonLd from "./_ProductJsonLd";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -89,6 +90,16 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
   return (
     <>
+      {/* JSON-LD structured data for Google rich product cards.
+          Invisible to users, renders as a <script> tag in <head>'s
+          server-streamed body context. Driven by the already-fetched
+          product/images/report so no extra DB reads. */}
+      <ProductJsonLd
+        product={product}
+        images={images}
+        conditionReport={conditionReport}
+      />
+
       {/* pb-32 reserves space at the bottom so the sticky CTA bar never
           overlaps page content at scroll end. ~128px covers single-row
           CTA on tablet/desktop and CTA + mobile anchor link on phones. */}
