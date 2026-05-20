@@ -6,8 +6,8 @@ import Link from "next/link";
 import Logo from "./_Logo";
 
 const NAV_LINKS = [
-  { href: "/products?condition=new", label: "Shop New" },
-  { href: "/products?condition=used", label: "Shop Used" },
+  { href: "/products/new", label: "Shop New" },
+  { href: "/products/used", label: "Shop Used" },
   { href: "/brands", label: "Brands" },
 ];
 
