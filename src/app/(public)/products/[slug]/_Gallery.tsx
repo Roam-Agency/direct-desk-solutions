@@ -109,9 +109,71 @@ export default function Gallery({
 
   return (
     <div className="relative mt-6 w-full">
+      {/* Desktop layout (lg+): vertical thumb strip + main image.
+          Hidden below lg. Both layouts share activeIndex state, so
+          clicking a thumb here updates the (hidden) mobile counter
+          and vice-versa — no behavioural difference. */}
+      {count > 0 && (
+        <div className="hidden lg:flex lg:gap-4">
+          {/* Thumb strip — only rendered when there's more than one
+              image. With a single image we still want the main panel
+              to fill the available width. */}
+          {hasMany && (
+            <div
+              role="tablist"
+              aria-label={`Image thumbnails for ${productName}`}
+              className="flex flex-col gap-2 w-20 shrink-0"
+            >
+              {images.map((image, idx) => (
+                <button
+                  key={image.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={idx === activeIndex}
+                  aria-label={`Show image ${idx + 1} of ${count}`}
+                  onClick={() => setActiveIndex(idx)}
+                  className={`relative aspect-square w-full overflow-hidden bg-rule transition-opacity ${
+                    idx === activeIndex
+                      ? "ring-2 ring-ink opacity-100"
+                      : "opacity-60 hover:opacity-100"
+                  }`}
+                >
+                  <Image
+                    src={image.cloudinary_url}
+                    alt=""
+                    fill
+                    sizes="80px"
+                    className="object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Main image panel */}
+          <div
+            className="relative flex-1 aspect-square bg-rule"
+            aria-live="polite"
+          >
+            <Image
+              src={images[activeIndex].cloudinary_url}
+              alt={
+                images[activeIndex].alt_text ||
+                `${productName} — image ${activeIndex + 1}`
+              }
+              fill
+              sizes="(min-width: 1024px) 50vw, 100vw"
+              priority={activeIndex === 0}
+              className="object-contain"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Mobile/tablet scroll-snap carousel (hidden at lg+). */}
       <div
         ref={scrollerRef}
-        className="flex aspect-square w-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden bg-rule motion-reduce:scroll-auto"
+        className="lg:hidden flex aspect-square w-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden bg-rule motion-reduce:scroll-auto"
         style={{ scrollBehavior: "smooth", scrollbarWidth: "none" }}
         aria-roledescription="carousel"
         aria-label={`Images of ${productName}`}
@@ -142,7 +204,7 @@ export default function Gallery({
       <CornerTab condition={condition} grade={grade} />
 
       {hasMany && (
-        <>
+        <div className="lg:hidden">
           {/* N / M counter, top-right */}
           <div className="absolute top-3 right-3 rounded-sm bg-ink/80 px-2 py-1 text-xs font-medium tracking-wide tabular-nums text-paper backdrop-blur-sm">
             {activeIndex + 1} / {count}
@@ -164,7 +226,7 @@ export default function Gallery({
               />
             ))}
           </div>
-        </>
+        </div>
       )}
     </div>
   );
