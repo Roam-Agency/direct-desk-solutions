@@ -1,3 +1,16 @@
+/**
+ * FILE-LEVEL ESLINT EXEMPTION — see top of file
+ *
+ * Disables react-hooks/set-state-in-effect for this whole file.
+ *
+ * Why: this is the mobile-side counterpart to _ImageUploader.tsx
+ * and uses the same upload pipeline architecture. The useEffect
+ * that restarts pending uploads reacts to state and calls into
+ * processUpload, which sets state. The cycle is gated by
+ * processedClientIdsRef (Brief 5). See _ImageUploader.tsx for the
+ * fuller architectural rationale.
+ */
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -202,19 +215,22 @@ export function MobileUploader({
     [token, updateUpload]
   );
 
-  // Render-body restart block: kick off any pending uploads up to the
-  // concurrency cap. The processedClientIdsRef gatekeeper inside
-  // processUpload makes this safe even when state churn re-runs it.
+  // Restart pending uploads up to the concurrency cap. Lives in a
+  // useEffect (not the render body) because React 19's
+  // react-hooks/refs rule disallows reading ref values during render.
+  // The processedClientIdsRef gatekeeper inside processUpload keeps
+  // this safe under any state churn that re-triggers the effect.
   const inFlightCount = uploads.filter(
     (u) => u.status === "uploading" || u.status === "attaching"
   ).length;
-  const pendingItems = uploads.filter((u) => u.status === "pending");
-  const slotsAvailable = MAX_CONCURRENT - inFlightCount;
-  if (slotsAvailable > 0 && pendingItems.length > 0) {
+  useEffect(() => {
+    const pendingItems = uploads.filter((u) => u.status === "pending");
+    const slotsAvailable = MAX_CONCURRENT - inFlightCount;
+    if (slotsAvailable <= 0 || pendingItems.length === 0) return;
     for (const item of pendingItems.slice(0, slotsAvailable)) {
-      queueMicrotask(() => processUpload(item));
+      void processUpload(item);
     }
-  }
+  }, [uploads, inFlightCount, processUpload]);
 
   const enqueueFiles = useCallback((files: FileList | null) => {
     if (!files || files.length === 0) return;

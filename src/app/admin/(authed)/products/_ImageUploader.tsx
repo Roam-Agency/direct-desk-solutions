@@ -1,3 +1,22 @@
+/**
+ * FILE-LEVEL ESLINT EXEMPTION — see top of file
+ *
+ * Disables react-hooks/set-state-in-effect for this whole file.
+ *
+ * Why: the upload pipeline's two useEffect blocks intentionally
+ * react to state changes (new pending uploads, finished slots) and
+ * call into processUpload, which sets state. ESLint's heuristic
+ * treats that shape as a cascading-render risk.
+ *
+ * In practice the cycle is broken by processedClientIdsRef — a Set
+ * that gates processUpload so a given clientId is only ever
+ * processed once (Brief 5, the duplicate-upload bug fix). The
+ * lint rule can't see that guarantee. Disabling at file level is
+ * more honest than three nested inline directives, and signals to
+ * future readers that this file knows about the rule and opts out
+ * deliberately.
+ */
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
@@ -775,45 +794,35 @@ export function ImageUploader({
         };
       });
 
-      setUploads((current) => {
-        const next = [...current, ...newItems];
-        // Decide which pending items should start uploading now.
-        const validNew = newItems.filter((i) => i.status === "pending");
-        const slotsFree = MAX_CONCURRENT_UPLOADS - inFlightCount;
-        const toStart = validNew.slice(0, Math.max(0, slotsFree));
-
-        // Kick off uploads outside of setUploads to avoid double-render.
-        // The processUpload calls will updateUpload through the ref pattern.
-        queueMicrotask(() => {
-          for (const item of toStart) {
-            void processUpload(item);
-          }
-        });
-
-        return next;
-      });
+      // Append the new items to state. The render-body useEffect
+      // below picks up any pending items and kicks them off once they
+      // land in state — single canonical "start pending" mechanism.
+      setUploads((current) => [...current, ...newItems]);
     },
-    [inFlightCount, processUpload]
+    []
   );
 
   // When an upload completes, see if any pending uploads can start.
-  // Implemented by reading uploads state on each render and starting any
-  // pending if slots are free.
-  const pendingUploadsAwaitingSlot = uploads.filter(
-    (u) => u.status === "pending"
-  );
-  if (
-    pendingUploadsAwaitingSlot.length > 0 &&
-    inFlightCount < MAX_CONCURRENT_UPLOADS
-  ) {
+  // Lives in a useEffect (not the render body) because React 19's
+  // react-hooks/refs rule disallows reading ref values during render.
+  // The processedClientIdsRef gatekeeper inside processUpload keeps
+  // this safe under any state churn that re-triggers the effect.
+  useEffect(() => {
+    const pendingUploadsAwaitingSlot = uploads.filter(
+      (u) => u.status === "pending"
+    );
+    if (
+      pendingUploadsAwaitingSlot.length === 0 ||
+      inFlightCount >= MAX_CONCURRENT_UPLOADS
+    ) {
+      return;
+    }
     const slotsFree = MAX_CONCURRENT_UPLOADS - inFlightCount;
     const toStart = pendingUploadsAwaitingSlot.slice(0, slotsFree);
-    queueMicrotask(() => {
-      for (const item of toStart) {
-        void processUpload(item);
-      }
-    });
-  }
+    for (const item of toStart) {
+      void processUpload(item);
+    }
+  }, [uploads, inFlightCount, processUpload]);
 
   const handleFiles = (filesList: FileList | null) => {
     if (!filesList || filesList.length === 0) return;
