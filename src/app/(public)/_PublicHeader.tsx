@@ -1,3 +1,4 @@
+// PR1_HEADER_SEARCH_ICON_AND_RESPONSIVE_LOGO
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -9,6 +10,26 @@ const NAV_LINKS = [
   { href: "/products?condition=used", label: "Shop Used" },
   { href: "/brands", label: "Brands" },
 ];
+
+// Reusable magnifying-glass icon. 24px square; stroke inherits via
+// currentColor so the desktop variant can pick up ink + hover red,
+// and the mobile variant keeps ink to match the hamburger bars.
+function SearchIcon() {
+  return (
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+    >
+      <circle cx="11" cy="11" r="7" />
+      <path d="M20 20L16 16" strokeLinecap="square" />
+    </svg>
+  );
+}
 
 export default function PublicHeader() {
   const [open, setOpen] = useState(false);
@@ -42,7 +63,12 @@ export default function PublicHeader() {
       <header className="sticky top-0 z-40 bg-paper border-b border-rule">
         <div className="mx-auto max-w-7xl px-6 h-16 flex items-center justify-between">
           <Link href="/" aria-label="Direct Desk Solutions home" className="block">
-            <Logo size={28} variant="dark" />
+            {/* Responsive logo sizing via arbitrary-variant child selectors.
+                Base 28px (mobile), 36px from md, 40px from lg. width:auto lets
+                the SVG's 340:110 intrinsic aspect ratio hold. */}
+            <span className="block [&>svg]:h-7 md:[&>svg]:h-9 lg:[&>svg]:h-10 [&>svg]:w-auto">
+              <Logo size={28} variant="dark" />
+            </span>
           </Link>
           {/* Desktop horizontal nav at lg+. Hidden below. */}
           <nav
@@ -58,21 +84,37 @@ export default function PublicHeader() {
                 {link.label}
               </Link>
             ))}
+            <Link
+              href="/search"
+              aria-label="Search products"
+              className="text-ink hover:text-brand-red transition-colors -mr-2 p-2"
+            >
+              <SearchIcon />
+            </Link>
           </nav>
 
-          {/* Hamburger — mobile + tablet only */}
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            aria-label="Open menu"
-            aria-expanded={open}
-            aria-controls="public-mobile-menu"
-            className="lg:hidden flex flex-col gap-[5px] p-2 -mr-2 hover:opacity-70 transition-opacity"
-          >
-            <span className="block w-6 h-[2px] bg-ink" />
-            <span className="block w-6 h-[2px] bg-ink" />
-            <span className="block w-6 h-[2px] bg-ink" />
-          </button>
+          {/* Mobile/tablet right-side cluster: search + hamburger */}
+          <div className="flex items-center gap-1 lg:hidden">
+            <Link
+              href="/search"
+              aria-label="Search products"
+              className="text-ink hover:opacity-70 transition-opacity p-2"
+            >
+              <SearchIcon />
+            </Link>
+            <button
+              type="button"
+              onClick={() => setOpen(true)}
+              aria-label="Open menu"
+              aria-expanded={open}
+              aria-controls="public-mobile-menu"
+              className="flex flex-col gap-[5px] p-2 -mr-2 hover:opacity-70 transition-opacity"
+            >
+              <span className="block w-6 h-[2px] bg-ink" />
+              <span className="block w-6 h-[2px] bg-ink" />
+              <span className="block w-6 h-[2px] bg-ink" />
+            </button>
+          </div>
         </div>
       </header>
 
