@@ -59,7 +59,7 @@ export default async function UsedProductsPage({
 
       <ListingGrid
         products={products}
-        emptyMessage="No used stock right now \u2014 check back soon"
+        emptyMessage="No used stock right now — check back soon"
       />
     </div>
   );

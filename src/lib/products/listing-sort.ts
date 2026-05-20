@@ -3,7 +3,7 @@
  *
  * Pure data. Lives in its own file so client components (the sort
  * dropdown) can import the type + options list without pulling in
- * fetch.ts \u2014 which transitively imports next/headers via the
+ * fetch.ts — which transitively imports next/headers via the
  * Supabase server client and would break a client component bundle.
  *
  * Server components import these via fetch.ts for ergonomics (one

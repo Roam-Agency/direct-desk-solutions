@@ -59,7 +59,7 @@ function UploadLinkProblem({
     exhausted:
       "This link has been used many times already. Ask for a new one to keep uploading.",
     not_found:
-      "We couldn\u2019t find this link. Check that you scanned the whole QR code, or ask for a new link.",
+      "We couldn’t find this link. Check that you scanned the whole QR code, or ask for a new link.",
   }[reason];
 
   return (
