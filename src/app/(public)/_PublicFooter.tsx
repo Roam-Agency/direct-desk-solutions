@@ -1,16 +1,47 @@
+import Link from "next/link";
 import Logo from "./_Logo";
 
 export default function PublicFooter() {
   return (
     <footer className="bg-ink text-white">
       <div className="mx-auto max-w-7xl px-6 py-12 sm:py-16">
-        <div className="flex flex-col gap-8 sm:flex-row sm:items-end sm:justify-between">
-          <div>
+        <div className="flex flex-col gap-10 sm:flex-row sm:items-start sm:justify-between sm:gap-12">
+          {/* Logo + tagline */}
+          <div className="sm:max-w-xs">
             <Logo size={28} variant="light" />
-            <p className="mt-4 max-w-xs text-sm leading-relaxed text-stone-400">
-              New and pre-owned office furniture, delivered across the UK.
+            <p className="mt-4 text-sm leading-relaxed text-stone-400">
+              New and pre-owned office furniture, delivered UK-wide from
+              our Darlington workshop.
             </p>
           </div>
+
+          {/* Why DDS link column — surfaces the three trust pages
+              site-wide without cluttering the homepage trust trio. */}
+          <nav aria-label="Why DDS" className="flex flex-col gap-3">
+            <p className="text-[10px] uppercase tracking-[0.22em] font-bold text-stone-500 mb-1">
+              Why DDS
+            </p>
+            <Link
+              href="/about"
+              className="text-xs uppercase tracking-[0.18em] font-bold text-white hover:text-brand-red transition-colors"
+            >
+              About
+            </Link>
+            <Link
+              href="/why-used"
+              className="text-xs uppercase tracking-[0.18em] font-bold text-white hover:text-brand-red transition-colors"
+            >
+              Why used?
+            </Link>
+            <Link
+              href="/how-we-refurbish"
+              className="text-xs uppercase tracking-[0.18em] font-bold text-white hover:text-brand-red transition-colors"
+            >
+              How we refurbish
+            </Link>
+          </nav>
+
+          {/* Contact */}
           <div className="flex flex-col gap-3 text-xs uppercase tracking-[0.18em] sm:items-end">
             <a
               href="mailto:info@directdesksolutions.com"
