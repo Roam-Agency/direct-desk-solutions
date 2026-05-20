@@ -182,7 +182,7 @@ export type ProductCard = ProductRow & {
  * helpers as a shared post-processing step so the SQL stays simple and
  * the heroless-products fallback only lives in one place.
  */
-async function attachHeroImagesToProducts(
+export async function attachHeroImagesToProducts(
   products: ProductRow[]
 ): Promise<ProductCard[]> {
   if (products.length === 0) return [];
@@ -327,6 +327,65 @@ export async function listLiveProducts(opts: {
   }
 
   return combined;
+}
+
+/**
+ * Search live products by name + description using a case-insensitive
+ * substring match. Returns ProductCard[] in the same shape as
+ * listLiveProducts so the existing ListingGrid renders results unchanged.
+ *
+ * Behaviour:
+ *   - Empty or whitespace-only queries return [].
+ *   - Queries longer than 100 characters are truncated. Search has no
+ *     legitimate need for War and Peace as input.
+ *   - The % and _ characters in user input are escaped so they're
+ *     treated as literal characters rather than ilike wildcards. A
+ *     search for "100%" should match products that contain "100%",
+ *     not every product in the catalogue.
+ *
+ * Why this and not full-text search: the catalogue is small (single
+ * digits of products on launch, ~10-50 at maturity). ilike is more
+ * than enough and avoids an `tsvector` column + indexing setup. If the
+ * catalogue grows past where ilike is fast, swap this helper's body
+ * for a tsvector query — the call sites don't change.
+ */
+export async function searchProducts(opts: {
+  query: string;
+  sortBy?: ListingSort;
+}): Promise<ProductCard[]> {
+  const trimmed = opts.query.trim().slice(0, 100);
+  if (trimmed.length === 0) return [];
+
+  // Escape ilike metacharacters so % and _ in user input are literal.
+  const escaped = trimmed.replace(/[\\%_]/g, "\\$&");
+  const pattern = `%${escaped}%`;
+
+  const supabase = await createClient();
+  const sortBy = opts.sortBy ?? _DEFAULT_SORT;
+
+  const query = supabase
+    .from("products")
+    .select("*")
+    .eq("status", "live")
+    .or(`name.ilike.${pattern},description.ilike.${pattern}`);
+
+  if (sortBy === "price-asc") {
+    query.order("price_pence", { ascending: true });
+  } else if (sortBy === "price-desc") {
+    query.order("price_pence", { ascending: false });
+  } else {
+    query.order("published_at", { ascending: false, nullsFirst: false });
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("searchProducts error", { opts, error });
+    return [];
+  }
+
+  // Reuse the shared hero-image attachment helper.
+  return attachHeroImagesToProducts(data ?? []);
 }
 
 /**
