@@ -24,6 +24,7 @@ type ConditionReportRow =
   Database["public"]["Tables"]["condition_reports"]["Row"];
 type ConditionReportItemRow =
   Database["public"]["Tables"]["condition_report_items"]["Row"];
+type CategoryRow = Database["public"]["Tables"]["categories"]["Row"];
 
 /**
  * Look up a single product by its URL slug.
@@ -177,6 +178,56 @@ export type ProductCard = ProductRow & {
 };
 
 /**
+ * Attach the hero image (or null) to each product. Used by the listing
+ * helpers as a shared post-processing step so the SQL stays simple and
+ * the heroless-products fallback only lives in one place.
+ */
+async function attachHeroImagesToProducts(
+  products: ProductRow[]
+): Promise<ProductCard[]> {
+  if (products.length === 0) return [];
+
+  const supabase = await createClient();
+  const productIds = products.map((p) => p.id);
+
+  const { data: heroes, error } = await supabase
+    .from("product_images")
+    .select("product_id, cloudinary_url, alt_text")
+    .in("product_id", productIds)
+    .eq("is_hero", true);
+
+  if (error) {
+    console.error("attachHeroImagesToProducts error", { error });
+    // Degrade to imageless cards rather than blowing up the page.
+    return products.map((p) => ({
+      ...p,
+      hero_image_url: null,
+      hero_image_alt: null,
+    }));
+  }
+
+  const heroByProductId = new Map<
+    string,
+    { cloudinary_url: string; alt_text: string | null }
+  >();
+  for (const row of heroes ?? []) {
+    heroByProductId.set(row.product_id, {
+      cloudinary_url: row.cloudinary_url,
+      alt_text: row.alt_text,
+    });
+  }
+
+  return products.map((p) => {
+    const hero = heroByProductId.get(p.id);
+    return {
+      ...p,
+      hero_image_url: hero?.cloudinary_url ?? null,
+      hero_image_alt: hero?.alt_text ?? null,
+    };
+  });
+}
+
+/**
  * List all live products of a given condition, with their hero image
  * URL attached for the listing card render.
  *
@@ -305,4 +356,181 @@ export async function countLiveProductsByCondition(): Promise<{
   }
 
   return counts;
+}
+
+/**
+ * The brand-tile projection returned by listBrandsWithCounts.
+ *
+ * Includes the category row plus a `live_product_count` computed by
+ * joining through product_categories to the products table. Used by
+ * the /brands index page to render each brand tile with a "X items"
+ * or "Coming soon" subtitle.
+ */
+export type BrandWithCount = CategoryRow & {
+  live_product_count: number;
+};
+
+/**
+ * List all active brand categories, sorted by sort_order then name,
+ * with a count of live products attached to each.
+ *
+ * The count reflects the current state of the catalogue — a brand with
+ * zero live products is included in the result (rendered as "Coming
+ * soon" on the index). Hiding zero-count brands would mean discovering
+ * them requires knowing the URL, which kills the editorial intent.
+ */
+export async function listBrandsWithCounts(): Promise<BrandWithCount[]> {
+  const supabase = await createClient();
+
+  // Fetch the brand categories first. Two queries is cleaner here than
+  // a single SQL with a subselect, because supabase-js's typed select
+  // doesn't have a great affordance for scalar subselects.
+  const { data: brands, error: brandsError } = await supabase
+    .from("categories")
+    .select("*")
+    .eq("kind", "brand")
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+
+  if (brandsError) {
+    console.error("listBrandsWithCounts error (brands)", { brandsError });
+    return [];
+  }
+
+  if (!brands || brands.length === 0) return [];
+
+  // For each brand, count the joined live products. One round-trip
+  // for the join, grouped in JS — simpler than an SQL count(*)+group_by
+  // through supabase-js's API.
+  const brandIds = brands.map((b) => b.id);
+  const { data: joins, error: joinsError } = await supabase
+    .from("product_categories")
+    .select("category_id, product:products!inner(status)")
+    .in("category_id", brandIds)
+    .eq("product.status", "live");
+
+  if (joinsError) {
+    console.error("listBrandsWithCounts error (joins)", { joinsError });
+    // Degrade to zero counts rather than blowing up the page.
+    return brands.map((b) => ({ ...b, live_product_count: 0 }));
+  }
+
+  const countByCategoryId = new Map<string, number>();
+  for (const row of joins ?? []) {
+    countByCategoryId.set(
+      row.category_id,
+      (countByCategoryId.get(row.category_id) ?? 0) + 1
+    );
+  }
+
+  return brands.map((b) => ({
+    ...b,
+    live_product_count: countByCategoryId.get(b.id) ?? 0,
+  }));
+}
+
+/**
+ * The result of looking up a brand by slug + its live products.
+ *
+ * Returns null if no active brand with that slug exists. Products
+ * comes back as an empty array if the brand exists but has no live
+ * products attached — the calling page renders an empty-state message.
+ */
+export type BrandWithProducts = {
+  brand: CategoryRow;
+  products: ProductCard[];
+};
+
+/**
+ * Look up a brand category by slug and return it alongside its live
+ * products as ProductCards.
+ *
+ * Returns null if:
+ *   - No category matches the slug
+ *   - The matching category is not kind='brand'
+ *   - The matching category is not is_active=true
+ *
+ * The page calling this should treat null as a 404. An existing brand
+ * with zero live products is NOT null — it returns { brand, products: [] }
+ * so the page can render the brand header with an empty-state message
+ * underneath.
+ */
+export async function listLiveProductsByBrandSlug(opts: {
+  brandSlug: string;
+  sortBy?: ListingSort;
+}): Promise<BrandWithProducts | null> {
+  const supabase = await createClient();
+  const sortBy = opts.sortBy ?? _DEFAULT_SORT;
+
+  // Resolve the brand category first. If it doesn't exist (or isn't
+  // active, or isn't kind='brand'), the page should 404 — we return
+  // null and let the caller handle it.
+  const { data: brand, error: brandError } = await supabase
+    .from("categories")
+    .select("*")
+    .eq("slug", opts.brandSlug)
+    .eq("kind", "brand")
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (brandError) {
+    console.error("listLiveProductsByBrandSlug error (brand)", {
+      opts,
+      brandError,
+    });
+    return null;
+  }
+
+  if (!brand) return null;
+
+  // Fetch the product IDs joined to this brand. We do this as a
+  // separate query rather than a single big join, because the
+  // join-and-flatten dance through product_categories returns nested
+  // rows that are awkward to project to ProductCard shape.
+  const { data: joins, error: joinsError } = await supabase
+    .from("product_categories")
+    .select("product_id")
+    .eq("category_id", brand.id);
+
+  if (joinsError) {
+    console.error("listLiveProductsByBrandSlug error (joins)", {
+      opts,
+      joinsError,
+    });
+    return { brand, products: [] };
+  }
+
+  const productIds = (joins ?? []).map((j) => j.product_id);
+  if (productIds.length === 0) return { brand, products: [] };
+
+  // Now fetch the live products themselves with the same sort logic
+  // as listLiveProducts.
+  const query = supabase
+    .from("products")
+    .select("*")
+    .in("id", productIds)
+    .eq("status", "live");
+
+  if (sortBy === "price-asc") {
+    query.order("price_pence", { ascending: true });
+  } else if (sortBy === "price-desc") {
+    query.order("price_pence", { ascending: false });
+  } else {
+    query.order("published_at", { ascending: false, nullsFirst: false });
+  }
+
+  const { data: products, error: productsError } = await query;
+
+  if (productsError) {
+    console.error("listLiveProductsByBrandSlug error (products)", {
+      opts,
+      productsError,
+    });
+    return { brand, products: [] };
+  }
+
+  // Attach hero images via the shared helper.
+  const productCards = await attachHeroImagesToProducts(products ?? []);
+  return { brand, products: productCards };
 }
