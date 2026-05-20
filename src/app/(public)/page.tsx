@@ -1,31 +1,168 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import SplitTile from "./products/_SplitTile";
+import BrandTile from "./brands/_BrandTile";
+import {
+  countLiveProductsByCondition,
+  listBrandsWithCounts,
+} from "@/lib/products/fetch";
+
+// BRIEF_12_SESSION_6_MARKER — homepage redesign, Phase 3 P0.
 
 export const metadata: Metadata = {
-  title: "Direct Desk Solutions",
+  title: "Direct Desk Solutions — Office furniture, honestly described",
   description:
-    "A smarter source for office furniture. New and pre-owned desks, chairs, storage, and more — delivered across the UK.",
+    "New and refurbished premium office furniture — Herman Miller, Steelcase, Vitra. Every used piece comes with a full condition report. Delivered across the UK.",
 };
 
-export default function PublicHomePage() {
+export default async function PublicHomePage() {
+  // Fetch in parallel — both helpers hit Supabase independently.
+  const [counts, brands] = await Promise.all([
+    countLiveProductsByCondition(),
+    listBrandsWithCounts(),
+  ]);
+
   return (
-    <div className="mx-auto max-w-3xl px-6 py-24 sm:py-32">
-      <p className="text-xs uppercase tracking-[0.22em] text-brand-red font-bold mb-6">
-        Phase 3 — coming online
-      </p>
-      <h1 className="text-4xl sm:text-5xl font-black tracking-tight leading-tight mb-6">
-        A smarter source for office furniture.
-      </h1>
-      <p className="text-base leading-relaxed text-ink/70 mb-10 max-w-xl">
-        New and pre-owned office furniture, delivered across the UK.
-        Our new home is being built — product browsing and full ordering
-        coming soon.
-      </p>
-      <a
-        href="mailto:info@directdesksolutions.com"
-        className="inline-block text-xs uppercase tracking-[0.18em] font-bold border-b-2 border-ink pb-1 hover:opacity-70 transition-opacity"
-      >
-        info@directdesksolutions.com
-      </a>
-    </div>
+    <>
+      {/* ===== 1. Hero — black editorial banner ===== */}
+      <section className="bg-ink text-paper">
+        <div className="mx-auto max-w-7xl px-6 py-20 sm:py-28 lg:py-36">
+          <p className="text-[10px] uppercase tracking-[0.28em] text-brand-red font-bold mb-6">
+            Direct Desk Solutions
+          </p>
+          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight leading-[0.95] mb-8 max-w-4xl">
+            Office furniture,
+            <br />
+            honestly described.
+          </h1>
+          <p className="text-base sm:text-lg text-paper/70 leading-relaxed mb-10 max-w-xl">
+            New stock and a curated catalogue of refurbished premium chairs and desks — Herman Miller, Steelcase, Vitra, and others. Every used piece comes with a full condition report so you know exactly what you&apos;re buying.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 sm:items-center">
+            <Link
+              href="/products/new"
+              className="inline-flex items-center justify-center bg-paper text-ink px-8 py-4 text-xs uppercase tracking-[0.18em] font-bold hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-ink"
+            >
+              Shop new
+            </Link>
+            <Link
+              href="/products/used"
+              className="inline-flex items-center text-xs uppercase tracking-[0.18em] font-bold border-b-2 border-paper pb-1 hover:opacity-70 transition-opacity self-start sm:self-auto"
+            >
+              Shop used →
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ===== 2. Shop New / Shop Used split tiles ===== */}
+      <section className="mx-auto max-w-7xl px-6 py-16 lg:py-24">
+        <div className="mb-10 lg:mb-14">
+          <p className="text-[10px] uppercase tracking-[0.22em] font-bold text-ink/60 mb-3">
+            Browse
+          </p>
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-[0.95]">
+            What are you looking for?
+          </h2>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+          <SplitTile
+            href="/products/new"
+            eyebrow="Browse"
+            title="Shop New"
+            blurb="Desks, chairs, storage and meeting room furniture. Full manufacturer warranty, UK delivery, easy returns."
+            count={counts.new}
+            accent="none"
+          />
+          <SplitTile
+            href="/products/used"
+            eyebrow="Browse"
+            title="Shop Used"
+            blurb="Premium pre-owned chairs and desks from Herman Miller, Steelcase, Vitra. Professionally refurbished with full condition reports."
+            count={counts.used}
+            accent="red"
+          />
+        </div>
+      </section>
+
+      {/* ===== 3. Brand shortcuts ===== */}
+      {brands.length > 0 && (
+        <section className="bg-paper border-t border-rule">
+          <div className="mx-auto max-w-7xl px-6 py-16 lg:py-24">
+            <div className="mb-10 lg:mb-14 flex items-end justify-between">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.22em] font-bold text-ink/60 mb-3">
+                  Brands
+                </p>
+                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-[0.95]">
+                  Premium, refurbished.
+                </h2>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {brands.map((b) => (
+                <BrandTile
+                  key={b.id}
+                  slug={b.slug}
+                  name={b.name}
+                  count={b.live_product_count}
+                />
+              ))}
+            </div>
+            <div className="mt-10 lg:mt-12">
+              <Link
+                href="/brands"
+                className="inline-flex items-center text-xs uppercase tracking-[0.18em] font-bold border-b-2 border-ink pb-1 hover:opacity-70 transition-opacity"
+              >
+                View all brands →
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ===== 4. Why DDS trust trio ===== */}
+      <section className="border-t border-rule">
+        <div className="mx-auto max-w-7xl px-6 py-16 lg:py-24">
+          <div className="mb-10 lg:mb-14">
+            <p className="text-[10px] uppercase tracking-[0.22em] font-bold text-ink/60 mb-3">
+              Why Direct Desk
+            </p>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-[0.95]">
+              Built on trust, not markup.
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 lg:gap-12">
+            <div>
+              <div className="h-0.5 w-10 bg-brand-red mb-5" aria-hidden="true" />
+              <h3 className="text-lg font-black tracking-tight mb-3">
+                UK workshop refurb
+              </h3>
+              <p className="text-sm text-ink/70 leading-relaxed">
+                Every used piece is professionally restored in our workshop before it&apos;s listed. We don&apos;t resell what we wouldn&apos;t use ourselves.
+              </p>
+            </div>
+            <div>
+              <div className="h-0.5 w-10 bg-brand-red mb-5" aria-hidden="true" />
+              <h3 className="text-lg font-black tracking-tight mb-3">
+                Full condition reports
+              </h3>
+              <p className="text-sm text-ink/70 leading-relaxed">
+                Photos, grades, and itemised observations on every refurbished item. What you see is what arrives.
+              </p>
+            </div>
+            <div>
+              <div className="h-0.5 w-10 bg-brand-red mb-5" aria-hidden="true" />
+              <h3 className="text-lg font-black tracking-tight mb-3">
+                12-month warranty
+              </h3>
+              <p className="text-sm text-ink/70 leading-relaxed">
+                Standard on all stock, new and used. Returns accepted within 14 days. UK delivery on every order.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </>
   );
 }
