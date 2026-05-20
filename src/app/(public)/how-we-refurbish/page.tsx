@@ -6,6 +6,27 @@ export const metadata: Metadata = {
   title: "How We Refurbish | Direct Desk Solutions",
   description:
     "Our refurbishment process — sourcing, inspection, mechanical service, condition reporting, and the 3-month warranty. The Darlington workshop, the bar, the receipts.",
+  openGraph: {
+    title: "How We Refurbish | Direct Desk Solutions",
+    description:
+      "Our refurbishment process — sourcing, inspection, mechanical service, condition reporting, and the 3-month warranty. The Darlington workshop, the bar, the receipts.",
+    type: "website",
+    images: [
+      {
+        url: "/og-default.png",
+        width: 1200,
+        height: 630,
+        alt: "Direct Desk Solutions",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "How We Refurbish | Direct Desk Solutions",
+    description:
+      "Our refurbishment process — sourcing, inspection, mechanical service, condition reporting, and the 3-month warranty. The Darlington workshop, the bar, the receipts.",
+    images: ["/og-default.png"],
+  },
 };
 
 export default function HowWeRefurbishPage() {

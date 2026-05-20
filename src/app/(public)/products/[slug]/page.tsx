@@ -27,11 +27,38 @@ export async function generateMetadata({
     return { title: "Product not found" };
   }
 
+  // Pull the hero image to use in social unfurls. Falls back to the
+  // default OG image if the product has no hero attached yet.
+  const images = await getProductImages(product.id);
+  const hero = images.find((img) => img.is_hero) ?? images[0];
+  const ogImage = hero?.cloudinary_url ?? "/og-default.png";
+  const ogAlt = hero?.alt_text ?? product.name;
+
+  const title = `${product.name}${product.brand ? ` — ${product.brand}` : ""}`;
+  const description =
+    product.description ??
+    `${product.name} from Direct Desk Solutions. New and pre-owned office furniture, delivered across the UK.`;
+
   return {
-    title: `${product.name}${product.brand ? ` — ${product.brand}` : ""}`,
-    description:
-      product.description ??
-      `${product.name} from Direct Desk Solutions. New and pre-owned office furniture, delivered across the UK.`,
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "website",
+      images: [
+        {
+          url: ogImage,
+          alt: ogAlt,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [ogImage],
+    },
   };
 }
 

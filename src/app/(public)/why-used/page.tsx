@@ -6,6 +6,27 @@ export const metadata: Metadata = {
   title: "Why Used? | Direct Desk Solutions",
   description:
     "A refurbished Herman Miller Aeron at £645 outperforms a new £200 mesh chair on every measure that matters. Here is why pre-owned premium beats new generic — and how we de-risk it for the buyer.",
+  openGraph: {
+    title: "Why Used? | Direct Desk Solutions",
+    description:
+      "A refurbished Herman Miller Aeron at £645 outperforms a new £200 mesh chair on every measure that matters. Here is why pre-owned premium beats new generic — and how we de-risk it for the buyer.",
+    type: "website",
+    images: [
+      {
+        url: "/og-default.png",
+        width: 1200,
+        height: 630,
+        alt: "Direct Desk Solutions",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Why Used? | Direct Desk Solutions",
+    description:
+      "A refurbished Herman Miller Aeron at £645 outperforms a new £200 mesh chair on every measure that matters. Here is why pre-owned premium beats new generic — and how we de-risk it for the buyer.",
+    images: ["/og-default.png"],
+  },
 };
 
 export default function WhyUsedPage() {
