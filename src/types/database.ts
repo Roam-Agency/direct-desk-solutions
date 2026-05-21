@@ -650,7 +650,13 @@ export type Database = {
     Enums: {
       category_kind: "functional" | "brand" | "merchandising"
       condition_severity: "faultless" | "light" | "moderate" | "significant"
-      order_status: "pending" | "paid" | "fulfilled" | "cancelled" | "refunded"
+      order_status:
+        | "pending"
+        | "paid"
+        | "fulfilled"
+        | "cancelled"
+        | "refunded"
+        | "backorder"
       product_condition: "new" | "used"
       product_grade: "A" | "B" | "C"
       product_status: "draft" | "live" | "archived"
@@ -784,7 +790,14 @@ export const Constants = {
     Enums: {
       category_kind: ["functional", "brand", "merchandising"],
       condition_severity: ["faultless", "light", "moderate", "significant"],
-      order_status: ["pending", "paid", "fulfilled", "cancelled", "refunded"],
+      order_status: [
+        "pending",
+        "paid",
+        "fulfilled",
+        "cancelled",
+        "refunded",
+        "backorder",
+      ],
       product_condition: ["new", "used"],
       product_grade: ["A", "B", "C"],
       product_status: ["draft", "live", "archived"],
