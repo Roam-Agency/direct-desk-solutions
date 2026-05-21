@@ -9,9 +9,10 @@ import Stripe from "stripe";
  *     the client where it is absent
  *   - Server Actions + the webhook route both import the same instance
  *
- * apiVersion is pinned. Without an explicit version Stripe uses the
- * account's default, which can be changed in the dashboard. Pinning
- * makes API schema changes intentional rather than surprising.
+ * apiVersion is NOT explicitly pinned. The SDK default matches the
+ * version it was compiled against, so the installed `stripe` package
+ * version in package.json is the lock surface. Bumping the SDK is the
+ * intentional upgrade; breaking changes surface as TS errors at build.
  *
  * Env vars used (set in .env.local + Netlify):
  *   STRIPE_SECRET_KEY              server-only, never reaches browser
