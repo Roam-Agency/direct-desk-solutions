@@ -78,29 +78,42 @@ export default function CheckoutRedirect() {
       qty: i.qty,
     }));
 
-    createCheckoutSession(payload).then((result) => {
-      if (result.ok) {
-        // Full-document navigation. router.push would not work here -
-        // checkout.stripe.com is a different origin.
-        window.location.assign(result.data.url);
-        return;
-      }
+    createCheckoutSession(payload)
+      .then((result) => {
+        if (result.ok) {
+          // Full-document navigation. router.push would not work here -
+          // checkout.stripe.com is a different origin.
+          window.location.assign(result.data.url);
+          return;
+        }
 
-      if (result.drift) {
-        // Send buyer back to /cart with a marker so /cart can show
-        // a "your basket changed" notice on top of the refreshed
-        // drift state.
-        router.replace("/cart?drift=1");
-        return;
-      }
+        if (result.drift) {
+          // Send buyer back to /cart with a marker so /cart can show
+          // a "your basket changed" notice on top of the refreshed
+          // drift state.
+          router.replace("/cart?drift=1");
+          return;
+        }
 
-      setStatus({
-        kind: "error",
-        message:
-          result.formError ??
-          "We could not open the secure payment page. Please try again.",
+        setStatus({
+          kind: "error",
+          message:
+            result.formError ??
+            "We could not open the secure payment page. Please try again.",
+        });
+      })
+      .catch((err) => {
+        // Server action rejected (uncaught exception server-side, network
+        // failure, etc.). Without this catch the spinner would hang
+        // forever. Reset the ref guard so the Try again button works.
+        console.error("createCheckoutSession threw", err);
+        startedRef.current = false;
+        setStatus({
+          kind: "error",
+          message:
+            "We could not open the secure payment page. Please try again.",
+        });
       });
-    });
   }, [mounted, items, router]);
 
   // Retry handler: reset the ref guard and restore the redirecting

@@ -7,8 +7,6 @@ import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe/server";
 import {
   computeShippingPence,
-  FLAT_SHIPPING_RATE_PENCE,
-  FREE_SHIPPING_THRESHOLD_PENCE,
   SHIPPING_ALLOWED_COUNTRIES,
   STOCK_RESERVATION_TTL_MINUTES,
 } from "@/lib/stripe/constants";
@@ -385,13 +383,3 @@ export async function createCheckoutSession(
   // ---- 9. Done. Return URL for client redirect ---------------------------
   return { ok: true, data: { url: session.url } };
 }
-
-// ---------------------------------------------------------------------------
-// Re-export shipping constants for the cart UI to display the rule it
-// is governed by. Single source of truth.
-// ---------------------------------------------------------------------------
-
-export {
-  FREE_SHIPPING_THRESHOLD_PENCE,
-  FLAT_SHIPPING_RATE_PENCE,
-};
