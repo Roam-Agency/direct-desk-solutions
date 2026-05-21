@@ -335,7 +335,7 @@ export async function createCheckoutSession(
     console.error("re-check stock failed", freshStockError);
     // Stripe session is already created and unused. It'll expire in 30
     // min, so this is recoverable. But we can't reserve, so we error.
-    return { ok: false, formError: "Could not reserve stock" };
+    return { ok: false, formError: "Could not verify stock" };
   }
 
   const freshStockById = new Map(
