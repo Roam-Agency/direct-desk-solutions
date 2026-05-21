@@ -88,6 +88,15 @@ export default async function ProductDetailPage({ params }: PageProps) {
       ? { label: "Shop Used", href: "/products?condition=used" }
       : { label: "Shop New", href: "/products?condition=new" };
 
+  // Hero image URL for the cart payload (StickyCTA passes this to the
+  // store on add). Same selection logic as generateMetadata above:
+  // explicit hero, else first image, else null. The two computations
+  // are intentionally not coupled — OG metadata also needs alt text
+  // and a default-image fallback, neither of which apply here.
+  const heroImage =
+    images.find((img) => img.is_hero) ?? images[0] ?? null;
+  const heroUrl = heroImage?.cloudinary_url ?? null;
+
   return (
     <>
       {/* JSON-LD structured data for Google rich product cards.
@@ -180,7 +189,15 @@ export default async function ProductDetailPage({ params }: PageProps) {
                   outside the wrapper). */}
               <div className="mt-10 hidden lg:block">
                 <StickyCTA
+                  productId={product.id}
+                  slug={product.slug}
+                  name={product.name}
+                  brand={product.brand}
+                  condition={product.condition}
+                  grade={product.condition_grade}
+                  heroUrl={heroUrl}
                   pricePence={product.price_pence}
+                  stockQuantity={product.stock_quantity}
                   hasPublishedReport={hasPublishedReport}
                   variant="desktop-inline"
                 />
@@ -223,7 +240,15 @@ export default async function ProductDetailPage({ params }: PageProps) {
       {/* Sticky CTA bar — rendered outside the pb-32 wrapper so it sits
           above page content as a fixed overlay. */}
       <StickyCTA
+        productId={product.id}
+        slug={product.slug}
+        name={product.name}
+        brand={product.brand}
+        condition={product.condition}
+        grade={product.condition_grade}
+        heroUrl={heroUrl}
         pricePence={product.price_pence}
+        stockQuantity={product.stock_quantity}
         hasPublishedReport={hasPublishedReport}
       />
     </>
