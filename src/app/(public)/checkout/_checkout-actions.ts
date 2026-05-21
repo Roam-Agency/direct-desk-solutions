@@ -242,7 +242,6 @@ export async function createCheckoutSession(
 
   // ---- 7. Create the Stripe Checkout session -----------------------------
   // Hosted-redirect flow. Stripe collects email, billing, and shipping.
-  // consent_collection captures GDPR-compliant marketing opt-in.
   let session: Stripe.Checkout.Session;
   try {
     session = await getStripe().checkout.sessions.create({
@@ -278,22 +277,23 @@ export async function createCheckoutSession(
       // skip if Stripe deems it optional in their region.
       phone_number_collection: { enabled: true },
 
-      // GDPR-compliant marketing consent. Stripe shows a checkbox the
-      // buyer must affirmatively tick - webhook reads consent.promotions.
-      consent_collection: {
-        promotions: "auto",
-        terms_of_service: "none",
-      },
+      // NOTE: consent_collection.promotions is a US-merchant-only feature
+      // per the Stripe SDK (`Only available to US merchants`). DDS is a
+      // UK merchant, so enabling it caused sessions.create to throw and
+      // the buyer hit "Could not start checkout". Marketing opt-in for
+      // UK will be handled via a separate post-purchase flow if needed.
 
       // Billing address is asked for by Stripe by default; this just
       // makes it explicit. Buyer-typed address is more reliable than
       // payment-method-derived address for invoicing.
       billing_address_collection: "required",
 
-      // 30-min expiry is shorter than Stripe's 24h default. Aligns
-      // roughly with our 15-min stock reservation TTL so abandoned
-      // sessions clear themselves on Stripe's side too.
-      expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
+      // 60-min expiry is shorter than Stripe's 24h default but well
+      // above the 30-minute minimum Stripe enforces. We avoid exactly
+      // 30 minutes because the small network round-trip can put the
+      // value just under 30 min by the time Stripe evaluates it,
+      // causing a 400.
+      expires_at: Math.floor(Date.now() / 1000) + 60 * 60,
 
       success_url: `${siteUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/cart?cancelled=1`,
