@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import type Stripe from "stripe";
 
 import { createClient, createAdminClient } from "@/lib/supabase/server";
-import { stripe } from "@/lib/stripe/server";
+import { getStripe } from "@/lib/stripe/server";
 import {
   computeShippingPence,
   FLAT_SHIPPING_RATE_PENCE,
@@ -247,7 +247,7 @@ export async function createCheckoutSession(
   // consent_collection captures GDPR-compliant marketing opt-in.
   let session: Stripe.Checkout.Session;
   try {
-    session = await stripe.checkout.sessions.create({
+    session = await getStripe().checkout.sessions.create({
       mode: "payment",
 
       line_items: stripeLineItems,

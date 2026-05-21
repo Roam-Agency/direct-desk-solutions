@@ -3,67 +3,81 @@ import Stripe from "stripe";
 /**
  * Stripe SDK client, configured from env vars.
  *
- * Why a wrapper module:
- *   - One place that reads + validates STRIPE_SECRET_KEY (fail fast)
- *   - Server-only by construction — the SECRET key would throw here on
- *     the client where it is absent
+ * --- Why a wrapper module ---
+ *   - One place that reads + validates STRIPE_SECRET_KEY
+ *   - Server-only by construction - the SECRET key would not exist on
+ *     the client
  *   - Server Actions + the webhook route both import the same instance
  *
- * apiVersion is NOT explicitly pinned. The SDK default matches the
- * version it was compiled against, so the installed `stripe` package
- * version in package.json is the lock surface. Bumping the SDK is the
- * intentional upgrade; breaking changes surface as TS errors at build.
+ * --- Why lazy-init (getStripe) and not a module-level const ---
+ * Module-load throws crash `next build` page-data collection even when
+ * env vars are present in .env.local, because Next evaluates modules
+ * before its env loader has finished wiring vars into the worker. The
+ * lazy pattern reads env on first call, by which point env is ready.
+ * Same pattern as getWebhookSecret() below. Memoised on first call so
+ * we still get a single Stripe instance per process.
  *
- * Env vars used (set in .env.local + Netlify):
+ * --- apiVersion ---
+ * NOT explicitly pinned. The SDK default matches the version it was
+ * compiled against, so the installed `stripe` package version in
+ * package.json is the lock surface. Bumping the SDK is the
+ * intentional upgrade; breaking changes surface as TS errors at
+ * build time.
+ *
+ * --- Env vars used (set in .env.local + Netlify) ---
  *   STRIPE_SECRET_KEY              server-only, never reaches browser
  *   STRIPE_WEBHOOK_SECRET          used by /api/stripe/webhook to verify
  *                                  signed payloads. Set after webhook
  *                                  endpoint is created in Stripe dashboard.
  *   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
- *                                  public, embedded in client code only if
- *                                  we add Elements / payment-method
- *                                  collection on our own pages. With Stripe
- *                                  hosted Checkout we redirect to Stripe so
- *                                  this is unused in Session 10 — but
- *                                  declared here so it's tracked.
+ *                                  public, embedded in client code only
+ *                                  if we later add Stripe Elements. With
+ *                                  hosted Checkout we redirect to Stripe
+ *                                  so this is currently unused - but the
+ *                                  accessor is here so it is tracked.
  */
 
-const secretKey = process.env.STRIPE_SECRET_KEY;
-const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
-
-if (!secretKey) {
-  throw new Error("STRIPE_SECRET_KEY is not set in environment");
-}
-if (!publishableKey) {
-  throw new Error("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is not set in environment");
-}
-
-export const stripe = new Stripe(secretKey, {
-  // No explicit apiVersion pin. The SDK defaults to the API version
-  // it was compiled against (matching the installed `stripe` package).
-  // Upgrade discipline: bumping `stripe` in package.json is the
-  // intentional upgrade, and our TypeScript types come from the same
-  // package, so breaking API changes surface as type errors at build
-  // time rather than runtime surprises.
-
-  // Type the integration so Stripe logs attribute usage to us.
-  appInfo: {
-    name: "Direct Desk Solutions",
-    version: "0.1.0",
-  },
-});
+let memoisedStripe: Stripe | null = null;
 
 /**
- * Publishable key re-exported for client components that need it
- * (e.g. if we later add Stripe Elements). Safe to expose.
+ * Returns a memoised Stripe client. Reads STRIPE_SECRET_KEY on first
+ * call. Throws if the env var is unset at call time.
  */
-export const STRIPE_PUBLISHABLE_KEY = publishableKey;
+export function getStripe(): Stripe {
+  if (memoisedStripe) return memoisedStripe;
+
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  if (!secretKey) {
+    throw new Error("STRIPE_SECRET_KEY is not set in environment");
+  }
+
+  memoisedStripe = new Stripe(secretKey, {
+    // No explicit apiVersion - SDK default matches package version.
+    appInfo: {
+      name: "Direct Desk Solutions",
+      version: "0.1.0",
+    },
+  });
+  return memoisedStripe;
+}
 
 /**
- * Webhook secret. Read lazily inside the webhook route, NOT at module
- * load, so the SDK module remains usable in environments that don't
- * have a webhook configured yet (e.g. local dev before stripe listen
- * starts). The route handler throws if missing at request time.
+ * Publishable key accessor. Same lazy pattern - read on call, throw
+ * if missing. Safe to expose to client components.
+ */
+export function getStripePublishableKey(): string {
+  const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+  if (!key) {
+    throw new Error(
+      "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is not set in environment"
+    );
+  }
+  return key;
+}
+
+/**
+ * Webhook secret accessor. Used by /api/stripe/webhook to verify
+ * signed payloads. Throws if missing at call time.
  */
 export function getWebhookSecret(): string {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
