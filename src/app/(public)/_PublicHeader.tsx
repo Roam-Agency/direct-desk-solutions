@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Logo from "./_Logo";
+import CartIconButton from "./_CartIconButton";
 
 const NAV_LINKS = [
   { href: "/products/new", label: "Shop New" },
@@ -87,10 +88,11 @@ export default function PublicHeader() {
             <Link
               href="/search"
               aria-label="Search products"
-              className="text-ink hover:text-brand-red transition-colors -mr-2 p-2"
+              className="text-ink hover:text-brand-red transition-colors p-2"
             >
               <SearchIcon />
             </Link>
+            <CartIconButton tone="desktop" />
           </nav>
 
           {/* Mobile/tablet right-side cluster: search + hamburger */}
@@ -102,6 +104,7 @@ export default function PublicHeader() {
             >
               <SearchIcon />
             </Link>
+            <CartIconButton tone="mobile" />
             <button
               type="button"
               onClick={() => setOpen(true)}
