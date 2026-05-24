@@ -55,6 +55,12 @@ export default async function AdminLayout({
               >
                 Categories
               </Link>
+              <Link
+                href="/admin/customers"
+                className="text-xs font-bold uppercase tracking-widest text-ink transition hover:text-brand-red"
+              >
+                Customers
+              </Link>
             </nav>
           </div>
 
