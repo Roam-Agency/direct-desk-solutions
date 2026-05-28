@@ -142,10 +142,26 @@ export default async function AdminDashboard() {
 
   return (
     <div>
+      {/* Brand masthead — sentence-style identity line above the page title */}
+      <p className="mb-6 text-sm text-ink/60">
+        Refurbished office furniture, sold direct from the warehouse.
+      </p>
+
       <SectionHeader eyebrow="Admin" title="Dashboard" />
 
-      {/* Block A — Photo drop zone */}
-      <div className="mt-8">
+      {/* Block A — Photo drop zone with brand explainer callout */}
+      <div className="mt-8 space-y-4">
+        <div className="border-l-2 border-brand-red bg-rule/20 px-4 py-3">
+          <p className="text-xs font-bold uppercase tracking-widest text-ink">
+            The fast way to list
+          </p>
+          <p className="mt-1 text-sm text-ink/70">
+            Drop product photos below to create drafts. Each photo gets
+            AI-suggested metadata — name, brand, description, condition
+            grade — ready for you to review. One photo creates one draft;
+            multiple photos create multiple drafts.
+          </p>
+        </div>
         <DashboardDropZone />
       </div>
 
