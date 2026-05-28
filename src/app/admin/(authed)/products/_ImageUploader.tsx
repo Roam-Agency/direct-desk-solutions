@@ -103,6 +103,13 @@ type AiSuggestionData = {
   condition_observations: string[];
   model: string;
   suggested_at: string;
+  // Draft fields (Branch 1, "AI Draft Core Fields"). Optional because rows
+  // written before that branch lack them; nullable because Branch 1
+  // normalises undefined → null at the write boundary.
+  name?: string | null;
+  description?: string | null;
+  brand?: string | null;
+  condition_grade?: "A" | "B" | "C" | null;
 };
 
 type UploadItem = {
@@ -143,6 +150,7 @@ function validateFile(file: File): string | null {
  */
 function AiSuggestionStrip({
   img,
+  isHero,
   isSuggesting,
   isApplyingAlt,
   isApplyingTags,
@@ -151,9 +159,11 @@ function AiSuggestionStrip({
   onApplyAlt,
   onApplyTags,
   onApplyCategories,
+  onApplyDraft,
   onResuggest,
 }: {
   img: AttachedImage;
+  isHero: boolean;
   isSuggesting: boolean;
   isApplyingAlt: boolean;
   isApplyingTags: boolean;
@@ -162,6 +172,12 @@ function AiSuggestionStrip({
   onApplyAlt: (imageId: string, alt: string) => void;
   onApplyTags: (tags: string[]) => void;
   onApplyCategories: (categoryIds: string[]) => void;
+  onApplyDraft?: (draft: {
+    name: string | null;
+    description: string | null;
+    brand: string | null;
+    condition_grade: "A" | "B" | "C" | null;
+  }) => void;
   onResuggest: (imageId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -230,6 +246,68 @@ function AiSuggestionStrip({
               {isApplyingAlt ? "Applying…" : "Apply alt →"}
             </button>
           </div>
+
+          {/* Draft product details — hero only. Shown when any draft field is
+              populated. Single "Apply" button fills empty form fields. */}
+          {isHero &&
+            onApplyDraft &&
+            (suggestion.name ||
+              suggestion.description ||
+              suggestion.brand ||
+              suggestion.condition_grade) && (
+              <div className="space-y-1 border-l-2 border-brand-red bg-brand-red/5 px-2 py-1.5">
+                <div className="text-[10px] font-bold uppercase tracking-widest text-brand-red">
+                  AI-drafted product details
+                </div>
+                <dl className="space-y-0.5 text-xs text-ink">
+                  {suggestion.name && (
+                    <div>
+                      <dt className="inline font-bold">Name: </dt>
+                      <dd className="inline">{suggestion.name}</dd>
+                    </div>
+                  )}
+                  {suggestion.brand && (
+                    <div>
+                      <dt className="inline font-bold">Brand: </dt>
+                      <dd className="inline">{suggestion.brand}</dd>
+                    </div>
+                  )}
+                  {suggestion.condition_grade && (
+                    <div>
+                      <dt className="inline font-bold">Condition: </dt>
+                      <dd className="inline">
+                        Used (grade {suggestion.condition_grade})
+                      </dd>
+                    </div>
+                  )}
+                  {suggestion.description && (
+                    <div>
+                      <dt className="text-[10px] font-bold uppercase tracking-widest text-ink/50">Description</dt>
+                      <dd className="mt-0.5">{suggestion.description}</dd>
+                    </div>
+                  )}
+                </dl>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onApplyDraft({
+                      name: suggestion.name ?? null,
+                      description: suggestion.description ?? null,
+                      brand: suggestion.brand ?? null,
+                      condition_grade: suggestion.condition_grade ?? null,
+                    });
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className="text-[10px] font-bold uppercase tracking-widest text-brand-red transition hover:text-ink"
+                >
+                  Apply to product details →
+                </button>
+                <p className="text-[10px] text-ink/40">
+                  Fills empty fields only. Price is always set by you.
+                </p>
+              </div>
+            )}
 
           {/* Tags */}
           {suggestion.tags.length > 0 && (
@@ -349,6 +427,7 @@ function SortableThumbnail({
   onApplyAlt,
   onApplyTags,
   onApplyCategories,
+  onApplyDraft,
   onResuggest,
 }: {
   img: AttachedImage;
@@ -369,6 +448,12 @@ function SortableThumbnail({
   onApplyAlt: (imageId: string, alt: string) => void;
   onApplyTags: (tags: string[]) => void;
   onApplyCategories: (categoryIds: string[]) => void;
+  onApplyDraft?: (draft: {
+    name: string | null;
+    description: string | null;
+    brand: string | null;
+    condition_grade: "A" | "B" | "C" | null;
+  }) => void;
   onResuggest: (imageId: string) => void;
 }) {
   const {
@@ -458,6 +543,7 @@ function SortableThumbnail({
       />
       <AiSuggestionStrip
         img={img}
+        isHero={img.is_hero}
         isSuggesting={isSuggesting}
         isApplyingAlt={isApplyingAlt}
         isApplyingTags={isApplyingTags}
@@ -466,6 +552,7 @@ function SortableThumbnail({
         onApplyAlt={onApplyAlt}
         onApplyTags={onApplyTags}
         onApplyCategories={onApplyCategories}
+        onApplyDraft={onApplyDraft}
         onResuggest={onResuggest}
       />
     </div>
@@ -510,6 +597,7 @@ export function ImageUploader({
   productName,
   initialImages,
   categories,
+  onApplyDraft,
 }: {
   productId: string;
   productName: string;
@@ -519,6 +607,17 @@ export function ImageUploader({
    * names in the AI suggestion strip (Claude returns UUIDs only).
    */
   categories: { id: string; name: string }[];
+  /**
+   * Optional callback fired when the admin clicks "Apply to product details"
+   * on the hero image's AI suggestion strip. The parent (ProductForm) fills
+   * empty form fields with the draft values. Omit to hide the apply button.
+   */
+  onApplyDraft?: (draft: {
+    name: string | null;
+    description: string | null;
+    brand: string | null;
+    condition_grade: "A" | "B" | "C" | null;
+  }) => void;
 }) {
   const [images, setImages] = useState<AttachedImage[]>(() =>
     initialImages.map(normaliseIncoming)
@@ -1337,6 +1436,7 @@ export function ImageUploader({
                     onApplyCategories={(cids) =>
                       handleApplyCategories(img.id, cids)
                     }
+                    onApplyDraft={onApplyDraft}
                     onResuggest={handleResuggest}
                   />
                 ))}
