@@ -3,6 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { DraftProductButton } from "./_DraftProductButton";
 import { formatPence } from "@/lib/products/format";
 import type { Database } from "@/types/database";
+import { SectionHeader } from "../_ui/SectionHeader";
+import { StatusPill } from "../_ui/StatusPill";
+import { ProductGallery } from "./_ProductGallery";
+import { ViewSwitcher } from "./_ViewSwitcher";
 
 type ProductRow = Database["public"]["Tables"]["products"]["Row"];
 type StatusFilter = "all" | "live" | "draft" | "archived";
@@ -83,15 +87,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
   return (
     <div>
-      <div className="flex items-end justify-between border-b border-rule pb-6">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-ink/60">
-            Catalogue
-          </p>
-          <h1 className="mt-1 text-4xl font-black tracking-tight">Products</h1>
-        </div>
-        <DraftProductButton variant="header" />
-      </div>
+      <SectionHeader eyebrow="Catalogue" title="Products" />
 
       <div className="mt-6 flex flex-wrap items-center gap-x-8 gap-y-4">
         <Tabs
@@ -127,7 +123,10 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         ) : !products || products.length === 0 ? (
           <EmptyState />
         ) : (
-          <ProductTable rows={products} heroByProductId={heroByProductId} />
+          <ViewSwitcher
+            table={<ProductTable rows={products} heroByProductId={heroByProductId} />}
+            gallery={<ProductGallery rows={products} heroByProductId={heroByProductId} />}
+          />
         )}
       </div>
     </div>
@@ -279,7 +278,7 @@ function Td({
 function toThumbUrl(url: string): string {
   return url.replace(
     "/upload/",
-    "/upload/c_fill,w_96,h_96,q_auto,f_auto/"
+    "/upload/c_fill,w_128,h_128,q_auto,f_auto/"
   );
 }
 
@@ -298,7 +297,7 @@ function ProductThumbnail({
 }) {
   if (!hero) {
     return (
-      <div className="h-12 w-12 border border-rule bg-rule/40" aria-hidden />
+      <div className="h-16 w-16 border border-rule bg-rule/40" aria-hidden />
     );
   }
   return (
@@ -306,9 +305,9 @@ function ProductThumbnail({
     <img
       src={toThumbUrl(hero.url)}
       alt={hero.alt ?? productName}
-      width={48}
-      height={48}
-      className="h-12 w-12 border border-rule object-cover"
+      width={64}
+      height={64}
+      className="h-16 w-16 border border-rule object-cover"
       loading="lazy"
     />
   );
@@ -333,25 +332,9 @@ function ConditionLabel({
 }
 
 function StatusLabel({ status }: { status: ProductRow["status"] }) {
-  if (status === "live") {
-    return (
-      <span className="text-xs font-bold uppercase tracking-widest text-green-700">
-        Live
-      </span>
-    );
-  }
-  if (status === "draft") {
-    return (
-      <span className="text-xs font-bold uppercase tracking-widest text-ink/40">
-        Draft
-      </span>
-    );
-  }
-  return (
-    <span className="text-xs font-bold uppercase tracking-widest text-ink/40 line-through">
-      Archived
-    </span>
-  );
+  const label =
+    status === "live" ? "Live" : status === "draft" ? "Draft" : "Archived";
+  return <StatusPill tone={status}>{label}</StatusPill>;
 }
 
 function EmptyState() {

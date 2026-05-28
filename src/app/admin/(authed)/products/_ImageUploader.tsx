@@ -1308,7 +1308,11 @@ export function ImageUploader({
           setIsDragging(false);
           handleFiles(e.dataTransfer.files);
         }}
-        className={`border-2 border-dashed px-6 py-12 text-center transition ${
+        className={`border-2 border-dashed text-center transition ${
+          images.length === 0
+            ? "flex min-h-[300px] flex-col items-center justify-center px-6 py-12"
+            : "px-6 py-12"
+        } ${
           isDragging
             ? "border-brand-red bg-brand-red/5"
             : "border-rule bg-paper"
