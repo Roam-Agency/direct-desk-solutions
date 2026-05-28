@@ -36,20 +36,20 @@ export default async function PublicHomePage() {
             honestly described.
           </h1>
           <p className="text-base sm:text-lg text-paper/70 leading-relaxed mb-10 max-w-xl">
-            New stock and a curated catalogue of refurbished premium chairs and desks — Herman Miller, Steelcase, Vitra, and others. Every used piece comes with a full condition report so you know exactly what you&apos;re buying.
+            A curated catalogue of refurbished premium chairs and desks — Herman Miller, Steelcase, Vitra. Professionally restored in our UK workshop, every piece sold with a full condition report so you know exactly what you&apos;re buying. New stock available too.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 sm:items-center">
             <Link
-              href="/products/new"
+              href="/products/used"
               className="inline-flex items-center justify-center bg-paper text-ink px-8 py-4 text-xs uppercase tracking-[0.18em] font-bold hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-brand-red focus:ring-offset-2 focus:ring-offset-ink"
             >
-              Shop new
+              Shop used
             </Link>
             <Link
-              href="/products/used"
+              href="/products/new"
               className="inline-flex items-center text-xs uppercase tracking-[0.18em] font-bold border-b-2 border-paper pb-1 hover:opacity-70 transition-opacity self-start sm:self-auto"
             >
-              Shop used →
+              Shop new →
             </Link>
           </div>
         </div>
@@ -65,23 +65,27 @@ export default async function PublicHomePage() {
             What are you looking for?
           </h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-          <SplitTile
-            href="/products/new"
-            eyebrow="Browse"
-            title="Shop New"
-            blurb="Desks, chairs, storage and meeting room furniture. Full manufacturer warranty, UK delivery, easy returns."
-            count={counts.new}
-            accent="none"
-          />
-          <SplitTile
-            href="/products/used"
-            eyebrow="Browse"
-            title="Shop Used"
-            blurb="Premium pre-owned chairs and desks from Herman Miller, Steelcase, Vitra. Professionally refurbished with full condition reports."
-            count={counts.used}
-            accent="red"
-          />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+          <div className="lg:col-span-2">
+            <SplitTile
+              href="/products/used"
+              eyebrow="The DDS difference"
+              title="Shop Used"
+              blurb="Premium pre-owned chairs and desks from Herman Miller, Steelcase, Vitra. Professionally refurbished in our UK workshop, every piece with a full condition report. Trade-clearance prices on furniture built to last decades."
+              count={counts.used}
+              accent="red"
+            />
+          </div>
+          <div className="lg:col-span-1">
+            <SplitTile
+              href="/products/new"
+              eyebrow="Also available"
+              title="Shop New"
+              blurb="Desks, chairs, storage and meeting room furniture. Full manufacturer warranty, UK delivery, easy returns."
+              count={counts.new}
+              accent="none"
+            />
+          </div>
         </div>
       </section>
 
@@ -154,10 +158,10 @@ export default async function PublicHomePage() {
             <div>
               <div className="h-0.5 w-10 bg-brand-red mb-5" aria-hidden="true" />
               <h3 className="text-lg font-black tracking-tight mb-3">
-                3-month warranty
+                Warranty on everything
               </h3>
               <p className="text-sm text-ink/70 leading-relaxed">
-                Standard on all stock, new and used. Returns accepted within 14 days. UK delivery on every order.
+                12-month warranty on new, 3-month on refurbished. Returns accepted within 14 days. UK delivery on every order.
               </p>
             </div>
           </div>
