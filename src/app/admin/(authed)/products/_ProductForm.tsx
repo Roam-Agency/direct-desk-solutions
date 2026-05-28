@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -181,6 +181,23 @@ export default function ProductForm({
   }
 
   /**
+   * Track which fields the most recent Apply Draft action filled, so the
+   * suggestion strip can show "Filled N fields" and the corresponding
+   * field labels can flash briefly. Cleared automatically after 4s.
+   */
+  const [lastApplied, setLastApplied] = useState<{
+    count: number;
+    fields: ReadonlyArray<"name" | "brand" | "description" | "grade">;
+    at: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!lastApplied) return;
+    const timer = setTimeout(() => setLastApplied(null), 4000);
+    return () => clearTimeout(timer);
+  }, [lastApplied]);
+
+  /**
    * Apply AI-drafted product details from the hero image's suggestion strip.
    *
    * Fill-blanks-only semantics — never overwrites a value the admin has
@@ -190,6 +207,9 @@ export default function ProductForm({
    *
    * When a condition_grade is set and the product is currently new, infer
    * condition='used' (grade is meaningless on new items).
+   *
+   * Records the set of fields it actually filled in `lastApplied` so the
+   * UI can surface visible feedback (strip footnote swap + label flash).
    */
   function handleApplyDraft(draft: {
     name: string | null;
@@ -197,17 +217,22 @@ export default function ProductForm({
     brand: string | null;
     condition_grade: "A" | "B" | "C" | null;
   }) {
+    const filled: Array<"name" | "brand" | "description" | "grade"> = [];
+
     const trimmedName = name.trim();
     const isUntitledPlaceholder =
       trimmedName === "" || /^untitled\s+draft$/i.test(trimmedName);
     if (draft.name && isUntitledPlaceholder) {
       setName(draft.name);
+      filled.push("name");
     }
     if (draft.description && description.trim() === "") {
       setDescription(draft.description);
+      filled.push("description");
     }
     if (draft.brand && brand.trim() === "") {
       setBrand(draft.brand);
+      filled.push("brand");
     }
     if (draft.condition_grade) {
       if (condition === "new") {
@@ -215,8 +240,24 @@ export default function ProductForm({
       }
       if (conditionGrade === "") {
         setConditionGrade(draft.condition_grade);
+        filled.push("grade");
       }
     }
+
+    setLastApplied({ count: filled.length, fields: filled, at: Date.now() });
+  }
+
+  /**
+   * Rebuild the slug from the current name, replacing a "draft-XXXXXX"
+   * placeholder slug. Visible only when slug still starts with "draft-"
+   * and name has moved away from "Untitled draft".
+   */
+  function handleRegenerateSlug() {
+    const auto = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    if (auto.length >= 3) setSlug(auto);
   }
 
   function buildInput(): ProductInput {
@@ -338,17 +379,43 @@ export default function ProductForm({
         </div>
       )}
 
-      <Section title="Identity">
-        <Field label="SKU" error={fieldErrors.sku} required>
-          <input
-            type="text"
-            value={sku}
-            onChange={(e) => setSku(e.target.value.toUpperCase())}
-            className="w-full border border-rule bg-paper px-4 py-3 font-mono text-sm focus:border-brand-red focus:outline-none"
-            placeholder="DDS-NEW-DSK-002"
+      {isEdit && name === "Untitled draft" && (
+        <div className="border-l-2 border-ink bg-paper px-4 py-3">
+          <p className="text-xs font-bold uppercase tracking-widest text-ink">
+            Draft created
+          </p>
+          <p className="mt-1 text-sm text-ink/70">
+            Drop a photo into the Photos section below to have AI draft the name, brand, and description — or fill the form manually. This nudge disappears once you change the name.
+          </p>
+        </div>
+      )}
+
+      {isEdit && initialProduct && (
+        <Section
+          title="Photos"
+          subtitle="Drag-drop, browse, or send to phone. Drag to reorder, hover for delete and hero controls. AI drafts product details from the hero image."
+        >
+          <ImageUploader
+            productId={initialProduct.id}
+            productName={initialProduct.name}
+            initialImages={initialImages}
+            categories={allCategories}
+            onApplyDraft={handleApplyDraft}
+            lastApplied={lastApplied}
           />
-        </Field>
-        <Field label="Name" error={fieldErrors.name} required>
+        </Section>
+      )}
+
+      <Section
+        title="Drafted from photo"
+        subtitle="Name, brand, description and grade can be filled by AI from your photos. Or just type them in."
+      >
+        <Field
+          label="Name"
+          error={fieldErrors.name}
+          required
+          flash={lastApplied?.fields.includes("name")}
+        >
           <input
             type="text"
             value={name}
@@ -357,19 +424,10 @@ export default function ProductForm({
           />
         </Field>
         <Field
-          label="Slug"
-          error={fieldErrors.slug}
-          required
-          hint="URL-safe identifier. Auto-generated from name when creating."
+          label="Brand"
+          error={fieldErrors.brand}
+          flash={lastApplied?.fields.includes("brand")}
         >
-          <input
-            type="text"
-            value={slug}
-            onChange={(e) => setSlug(e.target.value.toLowerCase())}
-            className="w-full border border-rule bg-paper px-4 py-3 font-mono text-sm focus:border-brand-red focus:outline-none"
-          />
-        </Field>
-        <Field label="Brand" error={fieldErrors.brand}>
           <input
             type="text"
             value={brand}
@@ -377,7 +435,11 @@ export default function ProductForm({
             className="w-full border border-rule bg-paper px-4 py-3 focus:border-brand-red focus:outline-none"
           />
         </Field>
-        <Field label="Description" error={fieldErrors.description}>
+        <Field
+          label="Description"
+          error={fieldErrors.description}
+          flash={lastApplied?.fields.includes("description")}
+        >
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -385,10 +447,7 @@ export default function ProductForm({
             className="w-full border border-rule bg-paper px-4 py-3 focus:border-brand-red focus:outline-none"
           />
         </Field>
-      </Section>
-
-      <Section title="Condition">
-        <Field label="Type" required>
+        <Field label="Condition type" required>
           <div className="flex gap-2">
             {(["new", "used"] as const).map((c) => (
               <label
@@ -414,65 +473,74 @@ export default function ProductForm({
         </Field>
 
         {condition === "used" && (
-          <>
-            <Field label="Grade" error={fieldErrors.condition_grade} required>
-              <div className="flex gap-2">
-                {(["A", "B", "C"] as const).map((g) => (
-                  <label
-                    key={g}
-                    className={
-                      conditionGrade === g
-                        ? "cursor-pointer border border-ink bg-ink px-4 py-2 font-mono text-xs font-bold text-paper"
-                        : "cursor-pointer border border-rule px-4 py-2 font-mono text-xs font-bold text-ink/60 hover:border-ink hover:text-ink"
-                    }
-                  >
-                    <input
-                      type="radio"
-                      name="conditionGrade"
-                      value={g}
-                      checked={conditionGrade === g}
-                      onChange={() => setConditionGrade(g)}
-                      className="sr-only"
-                    />
-                    Grade {g}
-                  </label>
-                ))}
-              </div>
-            </Field>
-            <Field
-              label="Condition notes"
-              error={fieldErrors.condition_notes}
-              hint="Disclosed faults, wear, repairs."
-            >
-              <textarea
-                value={conditionNotes}
-                onChange={(e) => setConditionNotes(e.target.value)}
-                rows={3}
-                className="w-full border border-rule bg-paper px-4 py-3 focus:border-brand-red focus:outline-none"
-              />
-            </Field>
-            <Field
-              label="Source"
-              error={fieldErrors.source}
-              hint="Where this came from. E.g. Corporate clear-out, EC2"
-            >
-              <input
-                type="text"
-                value={source}
-                onChange={(e) => setSource(e.target.value)}
-                className="w-full border border-rule bg-paper px-4 py-3 focus:border-brand-red focus:outline-none"
-              />
-            </Field>
-            <Field label="Refurb date" error={fieldErrors.refurb_date}>
-              <input
-                type="date"
-                value={refurbDate}
-                onChange={(e) => setRefurbDate(e.target.value)}
-                className="w-full border border-rule bg-paper px-4 py-3 focus:border-brand-red focus:outline-none"
-              />
-            </Field>
-          </>
+          <Field
+            label="Grade"
+            error={fieldErrors.condition_grade}
+            required
+            flash={lastApplied?.fields.includes("grade")}
+          >
+            <div className="flex gap-2">
+              {(["A", "B", "C"] as const).map((g) => (
+                <label
+                  key={g}
+                  className={
+                    conditionGrade === g
+                      ? "cursor-pointer border border-ink bg-ink px-4 py-2 font-mono text-xs font-bold text-paper"
+                      : "cursor-pointer border border-rule px-4 py-2 font-mono text-xs font-bold text-ink/60 hover:border-ink hover:text-ink"
+                  }
+                >
+                  <input
+                    type="radio"
+                    name="conditionGrade"
+                    value={g}
+                    checked={conditionGrade === g}
+                    onChange={() => setConditionGrade(g)}
+                    className="sr-only"
+                  />
+                  Grade {g}
+                </label>
+              ))}
+            </div>
+          </Field>
         )}
+      </Section>
+
+      <Section title="Identifiers">
+        <Field label="SKU" error={fieldErrors.sku} required>
+          <input
+            type="text"
+            value={sku}
+            onChange={(e) => setSku(e.target.value.toUpperCase())}
+            className="w-full border border-rule bg-paper px-4 py-3 font-mono text-sm focus:border-brand-red focus:outline-none"
+            placeholder="DDS-NEW-DSK-002"
+          />
+        </Field>
+        <Field
+          label="Slug"
+          error={fieldErrors.slug}
+          required
+          hint="URL-safe identifier. Auto-generated from name when creating."
+        >
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              value={slug}
+              onChange={(e) => setSlug(e.target.value.toLowerCase())}
+              className="w-full border border-rule bg-paper px-4 py-3 font-mono text-sm focus:border-brand-red focus:outline-none"
+            />
+            {slug.startsWith("draft-") &&
+              name.trim() !== "" &&
+              name.trim().toLowerCase() !== "untitled draft" && (
+                <button
+                  type="button"
+                  onClick={handleRegenerateSlug}
+                  className="shrink-0 border border-rule px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-ink/60 transition hover:border-ink hover:text-ink"
+                >
+                  Regen from name
+                </button>
+              )}
+          </div>
+        </Field>
       </Section>
 
       <Section title="Pricing">
@@ -646,18 +714,43 @@ export default function ProductForm({
         </Field>
       </Section>
 
-      {isEdit && initialProduct && (
+      {condition === "used" && (
         <Section
-          title="Images"
-          subtitle="Drag-drop, browse, or send to phone. Drag to reorder, hover for delete and hero controls."
+          title="Used item details"
+          subtitle="Admin-disclosed information about this specific used item. Buyers see condition notes on the public listing."
         >
-          <ImageUploader
-            productId={initialProduct.id}
-            productName={initialProduct.name}
-            initialImages={initialImages}
-            categories={allCategories}
-            onApplyDraft={handleApplyDraft}
-          />
+          <Field
+            label="Condition notes"
+            error={fieldErrors.condition_notes}
+            hint="Disclosed faults, wear, repairs."
+          >
+            <textarea
+              value={conditionNotes}
+              onChange={(e) => setConditionNotes(e.target.value)}
+              rows={3}
+              className="w-full border border-rule bg-paper px-4 py-3 focus:border-brand-red focus:outline-none"
+            />
+          </Field>
+          <Field
+            label="Source"
+            error={fieldErrors.source}
+            hint="Where this came from. E.g. Corporate clear-out, EC2"
+          >
+            <input
+              type="text"
+              value={source}
+              onChange={(e) => setSource(e.target.value)}
+              className="w-full border border-rule bg-paper px-4 py-3 focus:border-brand-red focus:outline-none"
+            />
+          </Field>
+          <Field label="Refurb date" error={fieldErrors.refurb_date}>
+            <input
+              type="date"
+              value={refurbDate}
+              onChange={(e) => setRefurbDate(e.target.value)}
+              className="w-full border border-rule bg-paper px-4 py-3 focus:border-brand-red focus:outline-none"
+            />
+          </Field>
         </Section>
       )}
 
@@ -761,18 +854,29 @@ function Field({
   error,
   hint,
   required,
+  flash,
 }: {
   label: string;
   children: React.ReactNode;
   error?: string;
   hint?: string;
   required?: boolean;
+  flash?: boolean;
 }) {
   return (
     <div>
-      <label className="block text-xs font-bold uppercase tracking-widest text-ink mb-2">
+      <label
+        className={
+          flash
+            ? "block text-xs font-bold uppercase tracking-widest text-brand-red mb-2 transition-colors"
+            : "block text-xs font-bold uppercase tracking-widest text-ink mb-2 transition-colors"
+        }
+      >
         {label}
         {required && <span className="ml-1 text-brand-red">*</span>}
+        {flash && (
+          <span className="ml-2 text-[10px] font-bold text-brand-red">JUST FILLED</span>
+        )}
       </label>
       {children}
       {hint && !error && (
