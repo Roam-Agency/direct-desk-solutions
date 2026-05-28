@@ -160,6 +160,7 @@ function AiSuggestionStrip({
   onApplyTags,
   onApplyCategories,
   onApplyDraft,
+  lastApplied,
   onResuggest,
 }: {
   img: AttachedImage;
@@ -178,6 +179,11 @@ function AiSuggestionStrip({
     brand: string | null;
     condition_grade: "A" | "B" | "C" | null;
   }) => void;
+  lastApplied?: {
+    count: number;
+    fields: ReadonlyArray<"name" | "brand" | "description" | "grade">;
+    at: number;
+  } | null;
   onResuggest: (imageId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -303,9 +309,17 @@ function AiSuggestionStrip({
                 >
                   Apply to product details →
                 </button>
-                <p className="text-[10px] text-ink/40">
-                  Fills empty fields only. Price is always set by you.
-                </p>
+                {lastApplied ? (
+              <p className="text-[10px] text-ink/40 font-bold text-brand-red">
+                {lastApplied.count > 0
+                  ? `Filled ${lastApplied.count} field${lastApplied.count === 1 ? "" : "s"} — Name, Brand, Description, Grade where empty`
+                  : "All fields already set — nothing to apply"}
+              </p>
+            ) : (
+              <p className="text-[10px] text-ink/40">
+                Fills empty fields only. Price is always set by you.
+              </p>
+            )}
               </div>
             )}
 
@@ -428,6 +442,7 @@ function SortableThumbnail({
   onApplyTags,
   onApplyCategories,
   onApplyDraft,
+  lastApplied,
   onResuggest,
 }: {
   img: AttachedImage;
@@ -454,6 +469,11 @@ function SortableThumbnail({
     brand: string | null;
     condition_grade: "A" | "B" | "C" | null;
   }) => void;
+  lastApplied?: {
+    count: number;
+    fields: ReadonlyArray<"name" | "brand" | "description" | "grade">;
+    at: number;
+  } | null;
   onResuggest: (imageId: string) => void;
 }) {
   const {
@@ -553,6 +573,7 @@ function SortableThumbnail({
         onApplyTags={onApplyTags}
         onApplyCategories={onApplyCategories}
         onApplyDraft={onApplyDraft}
+        lastApplied={lastApplied}
         onResuggest={onResuggest}
       />
     </div>
@@ -598,6 +619,7 @@ export function ImageUploader({
   initialImages,
   categories,
   onApplyDraft,
+  lastApplied,
 }: {
   productId: string;
   productName: string;
@@ -618,6 +640,11 @@ export function ImageUploader({
     brand: string | null;
     condition_grade: "A" | "B" | "C" | null;
   }) => void;
+  lastApplied?: {
+    count: number;
+    fields: ReadonlyArray<"name" | "brand" | "description" | "grade">;
+    at: number;
+  } | null;
 }) {
   const [images, setImages] = useState<AttachedImage[]>(() =>
     initialImages.map(normaliseIncoming)
@@ -1437,6 +1464,7 @@ export function ImageUploader({
                       handleApplyCategories(img.id, cids)
                     }
                     onApplyDraft={onApplyDraft}
+              lastApplied={lastApplied}
                     onResuggest={handleResuggest}
                   />
                 ))}
