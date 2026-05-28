@@ -180,6 +180,45 @@ export default function ProductForm({
     }
   }
 
+  /**
+   * Apply AI-drafted product details from the hero image's suggestion strip.
+   *
+   * Fill-blanks-only semantics — never overwrites a value the admin has
+   * already typed. Carve-out: the name placeholder "Untitled draft" (case-
+   * insensitive, allowing trailing whitespace) is treated as empty so the
+   * draft can fill it.
+   *
+   * When a condition_grade is set and the product is currently new, infer
+   * condition='used' (grade is meaningless on new items).
+   */
+  function handleApplyDraft(draft: {
+    name: string | null;
+    description: string | null;
+    brand: string | null;
+    condition_grade: "A" | "B" | "C" | null;
+  }) {
+    const trimmedName = name.trim();
+    const isUntitledPlaceholder =
+      trimmedName === "" || /^untitled\s+draft$/i.test(trimmedName);
+    if (draft.name && isUntitledPlaceholder) {
+      setName(draft.name);
+    }
+    if (draft.description && description.trim() === "") {
+      setDescription(draft.description);
+    }
+    if (draft.brand && brand.trim() === "") {
+      setBrand(draft.brand);
+    }
+    if (draft.condition_grade) {
+      if (condition === "new") {
+        setCondition("used");
+      }
+      if (conditionGrade === "") {
+        setConditionGrade(draft.condition_grade);
+      }
+    }
+  }
+
   function buildInput(): ProductInput {
     return {
       sku: sku.trim(),
@@ -617,6 +656,7 @@ export default function ProductForm({
             productName={initialProduct.name}
             initialImages={initialImages}
             categories={allCategories}
+            onApplyDraft={handleApplyDraft}
           />
         </Section>
       )}
