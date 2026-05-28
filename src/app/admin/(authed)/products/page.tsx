@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { DraftProductButton } from "./_DraftProductButton";
 import { formatPence } from "@/lib/products/format";
 import type { Database } from "@/types/database";
 
@@ -89,12 +90,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           </p>
           <h1 className="mt-1 text-4xl font-black tracking-tight">Products</h1>
         </div>
-        <Link
-          href="/admin/products/new"
-          className="bg-ink px-5 py-3 text-xs font-bold uppercase tracking-widest text-paper transition hover:bg-brand-red"
-        >
-          New product
-        </Link>
+        <DraftProductButton variant="header" />
       </div>
 
       <div className="mt-6 flex flex-wrap items-center gap-x-8 gap-y-4">
@@ -367,12 +363,7 @@ function EmptyState() {
       <p className="mt-2 text-sm text-ink/60">
         Try clearing the filters, or add a new product.
       </p>
-      <Link
-        href="/admin/products/new"
-        className="mt-6 inline-block bg-ink px-5 py-3 text-xs font-bold uppercase tracking-widest text-paper transition hover:bg-brand-red"
-      >
-        New product
-      </Link>
+      <DraftProductButton variant="empty-state" />
     </div>
   );
 }
