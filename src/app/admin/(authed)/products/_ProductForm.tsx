@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -77,6 +77,28 @@ export default function ProductForm({
   const [categoriesWarning, setCategoriesWarning] = useState<string | null>(
     null
   );
+
+  // Track whether the visible bottom action row is in the viewport.
+  // When it scrolls off, we render a fixed-position sticky save bar at
+  // the bottom of the screen so the admin never loses sight of Save.
+  // setState here is inside the IntersectionObserver callback (async),
+  // not in the effect body itself, so react-hooks/set-state-in-effect
+  // is satisfied.
+  const bottomRowRef = useRef<HTMLDivElement>(null);
+  const [isBottomVisible, setIsBottomVisible] = useState(true);
+
+  useEffect(() => {
+    const node = bottomRowRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsBottomVisible(entry.isIntersecting);
+      },
+      { threshold: 0 }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   // Strip the £ symbol so the input shows "499.00" not "£499.00"
   const priceDisplay = (pence: number | null | undefined): string => {
@@ -768,7 +790,44 @@ export default function ProductForm({
         </Section>
       )}
 
-      <div className="flex items-center justify-between border-t border-rule pt-8">
+      {/* Sticky save bar - mirrors Save + View on site when bottom row is off-screen */}
+      <div
+        className={
+          isBottomVisible
+            ? "hidden"
+            : "fixed bottom-0 left-0 right-0 z-40 border-t-2 border-ink bg-paper px-6 py-4 shadow-[0_-2px_8px_rgba(0,0,0,0.05)]"
+        }
+        aria-hidden={isBottomVisible}
+      >
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
+          <span className="text-xs font-bold uppercase tracking-widest text-ink/60">
+            {isEdit ? "Editing product" : "New product"}
+          </span>
+          <div className="flex items-center gap-3">
+            {isEdit &&
+              initialProduct?.status === "live" &&
+              initialProduct?.slug && (
+                <Link
+                  href={`/products/${initialProduct.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-bold uppercase tracking-widest text-ink/60 underline transition hover:text-brand-red"
+                >
+                  View on site →
+                </Link>
+              )}
+            <button
+              type="submit"
+              disabled={isPending}
+              className="bg-ink px-6 py-3 text-xs font-bold uppercase tracking-widest text-paper transition hover:bg-brand-red disabled:opacity-50"
+            >
+              {isPending ? "Saving…" : isEdit ? "Save changes" : "Create product"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div ref={bottomRowRef} className="flex items-center justify-between border-t border-rule pt-8">
         <div className="flex gap-3">
           <Link
             href="/admin/products"
@@ -783,6 +842,18 @@ export default function ProductForm({
           >
             {isPending ? "Saving…" : isEdit ? "Save changes" : "Create product"}
           </button>
+          {isEdit &&
+            initialProduct?.status === "live" &&
+            initialProduct?.slug && (
+              <Link
+                href={`/products/${initialProduct.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="self-center text-xs font-bold uppercase tracking-widest text-ink/60 underline transition hover:text-brand-red"
+              >
+                View on site →
+              </Link>
+            )}
         </div>
 
         {isEdit && (
@@ -833,7 +904,7 @@ function Section({
 }) {
   return (
     <section>
-      <div className="mb-6 border-b border-rule pb-2">
+      <div className="mb-8 border-b-2 border-ink pb-4">
         <h2 className="text-xs font-bold uppercase tracking-widest text-ink">
           {title}
         </h2>
