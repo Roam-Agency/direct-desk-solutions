@@ -57,7 +57,7 @@ export function MarginCalculator({ price, costPrice }: Props) {
   const markupPctDisplay = markupPct.toFixed(1);
 
   return (
-    <div className="mt-2 flex flex-wrap items-baseline gap-x-6 gap-y-1 border-l-2 border-rule pl-3 font-mono text-sm">
+    <div className="mt-2 flex flex-wrap items-baseline gap-x-6 gap-y-1 border-l-2 border-brand-red bg-rule/20 px-3 py-2 font-mono text-sm">
       <span className="text-ink/60">Live margin</span>
       <span className={isNegative ? "text-brand-red" : "text-ink"}>
         £{marginPounds}
