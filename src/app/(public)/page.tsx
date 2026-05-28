@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import SplitTile from "./products/_SplitTile";
 import BrandTile from "./brands/_BrandTile";
@@ -110,6 +111,7 @@ export default async function PublicHomePage() {
                   slug={b.slug}
                   name={b.name}
                   count={b.live_product_count}
+                  backgroundImage="/decor/office-mono.jpg"
                 />
               ))}
             </div>
@@ -125,11 +127,21 @@ export default async function PublicHomePage() {
         </section>
       )}
 
-      {/* ===== 4. Why DDS trust trio ===== */}
-      <section className="border-t border-rule">
-        <div className="mx-auto max-w-7xl px-6 py-16 lg:py-24">
+      {/* ===== 4. Why DDS trust trio — dark band, bookends the hero ===== */}
+      <section className="relative bg-ink text-paper overflow-hidden">
+        {/* Decorative loft backdrop, heavily darkened so text stays legible */}
+        <Image
+          src="/decor/office-loft.jpg"
+          alt=""
+          aria-hidden="true"
+          fill
+          sizes="100vw"
+          className="object-cover"
+        />
+        <div className="absolute inset-0 bg-ink/85" aria-hidden="true" />
+        <div className="relative z-10 mx-auto max-w-7xl px-6 py-16 lg:py-24">
           <div className="mb-10 lg:mb-14">
-            <p className="text-[10px] uppercase tracking-[0.22em] font-bold text-ink/60 mb-3">
+            <p className="text-[10px] uppercase tracking-[0.22em] font-bold text-paper/60 mb-3">
               Why Direct Desk
             </p>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-[0.95]">
@@ -142,7 +154,7 @@ export default async function PublicHomePage() {
               <h3 className="text-lg font-black tracking-tight mb-3">
                 UK workshop refurb
               </h3>
-              <p className="text-sm text-ink/70 leading-relaxed">
+              <p className="text-sm text-paper/70 leading-relaxed">
                 Every used piece is professionally restored in our workshop before it&apos;s listed. We don&apos;t resell what we wouldn&apos;t use ourselves.
               </p>
             </div>
@@ -151,7 +163,7 @@ export default async function PublicHomePage() {
               <h3 className="text-lg font-black tracking-tight mb-3">
                 Full condition reports
               </h3>
-              <p className="text-sm text-ink/70 leading-relaxed">
+              <p className="text-sm text-paper/70 leading-relaxed">
                 Photos, grades, and itemised observations on every refurbished item. What you see is what arrives.
               </p>
             </div>
@@ -160,7 +172,7 @@ export default async function PublicHomePage() {
               <h3 className="text-lg font-black tracking-tight mb-3">
                 Warranty on everything
               </h3>
-              <p className="text-sm text-ink/70 leading-relaxed">
+              <p className="text-sm text-paper/70 leading-relaxed">
                 12-month warranty on new, 3-month on refurbished. Returns accepted within 14 days. UK delivery on every order.
               </p>
             </div>
