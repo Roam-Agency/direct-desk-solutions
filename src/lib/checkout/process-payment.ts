@@ -2,6 +2,7 @@ import type Stripe from "stripe";
 
 import { createAdminClient } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe/server";
+import type { OrderConfirmationPayload } from "@/lib/email/order-confirmation";
 
 /**
  * Stripe checkout.session.completed handler.
@@ -50,7 +51,10 @@ import { getStripe } from "@/lib/stripe/server";
  */
 export async function processCheckoutCompleted(
   event: Stripe.Event
-): Promise<{ orderId: string; backorder: boolean } | { skipped: string }> {
+): Promise<
+  | { orderId: string; backorder: boolean; emailPayload: OrderConfirmationPayload }
+  | { skipped: string }
+> {
   if (event.type !== "checkout.session.completed") {
     return { skipped: `event type ${event.type} not handled` };
   }
@@ -445,5 +449,40 @@ export async function processCheckoutCompleted(
     }
   }
 
-  return { orderId, backorder: isBackorder };
+  // ---------- 10. Build the email payload ----------
+  // Everything below is already computed above; we just shape it for
+  // the confirmation email. The route handler sends it best-effort.
+  const emailPayload: OrderConfirmationPayload = {
+    to: email,
+    customerName: fullName || null,
+    orderId,
+    isBackorder,
+    items: reservations.map((r) => {
+      const product = productById.get(r.product_id)!;
+      return {
+        name: product.name,
+        brand: product.brand,
+        condition: product.condition,
+        grade: product.condition_grade,
+        quantity: r.quantity,
+        unitPricePence: product.price_pence,
+        lineTotalPence: product.price_pence * r.quantity,
+      };
+    }),
+    subtotalPence,
+    shippingPence,
+    totalPence,
+    shippingAddress: shippingAddress
+      ? {
+          name: shippingAddress.name,
+          line1: shippingAddress.line1,
+          line2: shippingAddress.line2,
+          city: shippingAddress.city,
+          postalCode: shippingAddress.postal_code,
+          country: shippingAddress.country,
+        }
+      : null,
+  };
+
+  return { orderId, backorder: isBackorder, emailPayload };
 }
