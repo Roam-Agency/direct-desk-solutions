@@ -14,17 +14,36 @@
 import Image from "next/image";
 import Link from "next/link";
 
+/**
+ * Decorative backdrop pool. Tiles rotate through these by index so no
+ * two adjacent tiles share a photo. Deterministic per index = stable
+ * across renders (no layout flash, no hydration mismatch).
+ */
+const DECOR_POOL = [
+  "/decor/office-mono.jpg",
+  "/decor/office-1.jpg",
+  "/decor/office-2.jpg",
+  "/decor/office-loft.jpg",
+  "/decor/office-4.jpg",
+  "/decor/office-5.jpg",
+  "/decor/office-6.jpg",
+] as const;
+
 export default function BrandTile({
   slug,
   name,
   count,
-  backgroundImage,
+  imageIndex,
 }: {
   slug: string;
   name: string;
   count: number;
-  backgroundImage?: string;
+  imageIndex?: number;
 }) {
+  const backgroundImage =
+    imageIndex === undefined
+      ? undefined
+      : DECOR_POOL[imageIndex % DECOR_POOL.length];
   const subtitle =
     count === 0
       ? "Coming soon"

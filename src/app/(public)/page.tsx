@@ -25,9 +25,19 @@ export default async function PublicHomePage() {
 
   return (
     <>
-      {/* ===== 1. Hero — black editorial banner ===== */}
-      <section className="bg-ink text-paper">
-        <div className="mx-auto max-w-7xl px-6 py-20 sm:py-28 lg:py-36">
+      {/* ===== 1. Hero — black editorial banner with darkened backdrop ===== */}
+      <section className="relative bg-ink text-paper overflow-hidden">
+        <Image
+          src="/decor/office-loft.jpg"
+          alt=""
+          aria-hidden="true"
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover"
+        />
+        <div className="absolute inset-0 bg-ink/80" aria-hidden="true" />
+        <div className="relative z-10 mx-auto max-w-7xl px-6 py-20 sm:py-28 lg:py-36">
           <p className="text-[10px] uppercase tracking-[0.28em] text-brand-red font-bold mb-6">
             Direct Desk Solutions
           </p>
@@ -105,13 +115,13 @@ export default async function PublicHomePage() {
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {brands.map((b) => (
+              {brands.map((b, i) => (
                 <BrandTile
                   key={b.id}
                   slug={b.slug}
                   name={b.name}
                   count={b.live_product_count}
-                  backgroundImage="/decor/office-mono.jpg"
+                  imageIndex={i}
                 />
               ))}
             </div>
