@@ -3,6 +3,7 @@ import type Stripe from "stripe";
 
 import { getStripe, getWebhookSecret } from "@/lib/stripe/server";
 import { processCheckoutCompleted } from "@/lib/checkout/process-payment";
+import { sendOrderConfirmation } from "@/lib/email/order-confirmation";
 
 /**
  * Stripe webhook endpoint - POST /api/stripe/webhook.
@@ -83,6 +84,29 @@ export async function POST(req: Request): Promise<NextResponse> {
     if ("skipped" in result) {
       return NextResponse.json({ received: true, skipped: true, reason: result.skipped });
     }
+    // Best-effort order confirmation email. A send failure must NOT
+    // propagate: throwing here would return 500, Stripe would retry,
+    // and the idempotency early-exit means the order would NOT be
+    // re-written but the email WOULD be re-sent => duplicate emails.
+    // So we log and swallow. The order write is the source of truth;
+    // the email is a courtesy.
+    try {
+      const emailResult = await sendOrderConfirmation(result.emailPayload);
+      if (!emailResult.ok) {
+        console.error("webhook: order confirmation email failed", {
+          orderId: result.orderId,
+          error: emailResult.error,
+        });
+      }
+    } catch (emailErr) {
+      const emsg =
+        emailErr instanceof Error ? emailErr.message : String(emailErr);
+      console.error("webhook: order confirmation email threw", {
+        orderId: result.orderId,
+        error: emsg,
+      });
+    }
+
     return NextResponse.json({
       received: true,
       orderId: result.orderId,
