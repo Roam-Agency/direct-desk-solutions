@@ -16,12 +16,27 @@
  * (pending, paid, fulfilled, refunded) can map to the same pill
  * vocabulary via the `customTone` prop without forking the component.
  */
-type StatusTone = "live" | "draft" | "archived";
+type StatusTone =
+  | "live"
+  | "draft"
+  | "archived"
+  | "pending"
+  | "paid"
+  | "fulfilled"
+  | "cancelled"
+  | "refunded";
 
 const TONE_CLASSES: Record<StatusTone, string> = {
+  // Product statuses
   live: "bg-brand-red text-paper",
   draft: "bg-ink text-paper",
   archived: "bg-ink/20 text-ink/50",
+  // Order statuses
+  paid: "bg-ink text-paper",
+  fulfilled: "bg-ink/15 text-ink",
+  pending: "bg-rule/40 text-ink/70",
+  cancelled: "bg-rule/30 text-ink/40",
+  refunded: "bg-rule/30 text-ink/40",
 };
 
 export function StatusPill({

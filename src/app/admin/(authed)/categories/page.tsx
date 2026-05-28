@@ -67,9 +67,9 @@ export default async function CategoriesPage({ searchParams }: PageProps) {
 
   return (
     <div className="space-y-10">
-      <div className="flex items-end justify-between">
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b-2 border-ink pb-5">
         <div>
-          <h1 className="text-3xl font-black tracking-tight">Categories</h1>
+          <h1 className="text-4xl font-black tracking-tight">Categories</h1>
           <p className="mt-2 text-sm text-ink/60">
             Taxonomy for the catalogue. Three kinds, each browseable separately
             on the customer site.

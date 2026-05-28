@@ -8,6 +8,7 @@ import {
   type OrderStatusFilter,
 } from "@/lib/orders/fetch";
 import { formatPence } from "@/lib/products/format";
+import { SectionHeader } from "../_ui/SectionHeader";
 
 interface OrdersPageProps {
   searchParams: Promise<{
@@ -126,21 +127,21 @@ function statusPillClasses(
  */
 function statusBadgeClasses(status: string): string {
   const base =
-    "inline-block border px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest";
+    "inline-block px-2 py-1 text-[10px] font-bold uppercase tracking-widest";
   if (status === "backorder") {
-    return `${base} border-brand-red bg-brand-red text-paper`;
+    return `${base} bg-brand-red text-paper`;
   }
   if (status === "paid") {
-    return `${base} border-ink bg-ink text-paper`;
+    return `${base} bg-ink text-paper`;
   }
   if (status === "fulfilled") {
-    return `${base} border-ink/40 bg-ink/10 text-ink`;
+    return `${base} bg-ink/15 text-ink`;
   }
   if (status === "refunded" || status === "cancelled") {
-    return `${base} border-rule bg-paper text-ink/50`;
+    return `${base} bg-rule/30 text-ink/40`;
   }
   // pending and anything unknown
-  return `${base} border-rule bg-paper text-ink/70`;
+  return `${base} bg-rule/40 text-ink/70`;
 }
 
 export default async function OrdersPage({ searchParams }: OrdersPageProps) {
@@ -166,22 +167,23 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
 
   return (
     <div className="space-y-8">
-      {/* Header row \u2014 title + Export CSV */}
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-3xl font-black tracking-tight">Orders</h1>
-          <p className="mt-1 text-sm text-ink/60">
-            {orders.length} {orders.length === 1 ? "order" : "orders"}
-            {status !== "all" && ` \u00b7 ${STATUS_LABELS[status]}`}
-            {search && ` matching "${search}"`}
-          </p>
-        </div>
-        <a
-          href={exportHref}
-          className="border border-ink bg-ink px-4 py-2 text-xs font-bold uppercase tracking-widest text-paper transition hover:bg-brand-red hover:border-brand-red">
-          Export CSV
-        </a>
-      </div>
+      <SectionHeader
+        eyebrow="Activity"
+        title="Orders"
+        action={
+          <a
+            href={exportHref}
+            className="border border-ink bg-ink px-4 py-2 text-xs font-bold uppercase tracking-widest text-paper transition hover:bg-brand-red hover:border-brand-red"
+          >
+            Export CSV
+          </a>
+        }
+      />
+      <p className="text-sm text-ink/60">
+        {orders.length} {orders.length === 1 ? "order" : "orders"}
+        {status !== "all" && ` \u00b7 ${STATUS_LABELS[status]}`}
+        {search && ` matching "${search}"`}
+      </p>
 
       {/* Status filter pills */}
       <div className="flex flex-wrap gap-2">

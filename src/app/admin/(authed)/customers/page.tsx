@@ -6,6 +6,7 @@ import {
   type CustomerSort,
 } from "@/lib/customers/fetch";
 import { formatPence } from "@/lib/products/format";
+import { SectionHeader } from "../_ui/SectionHeader";
 
 interface CustomersPageProps {
   searchParams: Promise<{
@@ -80,22 +81,22 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
 
   return (
     <div className="space-y-8">
-      {/* Header row \u2014 title + Export CSV */}
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-3xl font-black tracking-tight">Customers</h1>
-          <p className="mt-1 text-sm text-ink/60">
-            {customers.length} {customers.length === 1 ? "customer" : "customers"}
-            {search && ` matching "${search}"`}
-          </p>
-        </div>
-        <a
-          href={exportHref}
-          className="border border-ink bg-ink px-4 py-2 text-xs font-bold uppercase tracking-widest text-paper transition hover:bg-brand-red hover:border-brand-red"
-        >
-          Export CSV
-        </a>
-      </div>
+      <SectionHeader
+        eyebrow="People"
+        title="Customers"
+        action={
+          <a
+            href={exportHref}
+            className="border border-ink bg-ink px-4 py-2 text-xs font-bold uppercase tracking-widest text-paper transition hover:bg-brand-red hover:border-brand-red"
+          >
+            Export CSV
+          </a>
+        }
+      />
+      <p className="text-sm text-ink/60">
+        {customers.length} {customers.length === 1 ? "customer" : "customers"}
+        {search && ` matching "${search}"`}
+      </p>
 
       {/* Filters row \u2014 search box + sort dropdown */}
       <div className="flex flex-wrap items-end gap-4">
