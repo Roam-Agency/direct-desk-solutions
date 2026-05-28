@@ -50,6 +50,103 @@ function zodErrorsToFieldErrors(
   return result;
 }
 
+/**
+ * Create a skeleton draft product and return its id.
+ *
+ * Photo-first flow entry point: admin clicks "New product" on the list page,
+ * this runs, inserts a stub row, and the client redirects to the edit page
+ * where the ImageUploader is enabled (because isEdit is true).
+ *
+ * SKU format: DDS-DRAFT-XXXXXX (6 uppercase alphanumeric chars).
+ * Slug:       draft-xxxxxx     (same 6 chars, lowercase).
+ *
+ * The 6-char suffix gives ~2 billion possibilities; collision risk at this
+ * catalogue's volume is effectively zero. We still retry once on a SKU
+ * unique-violation as a belt-and-braces measure.
+ *
+ * Price is set to 0 (£0.00) as a clearly-placeholder value. The brief's
+ * "Price is always set by you" contract is preserved — admin must change
+ * before publishing.
+ */
+export async function createDraftProduct(): Promise<ActionResult> {
+  const supabase = await createClient();
+
+  // Try up to twice — once with a fresh suffix, once more if we hit a
+  // SKU collision. After that, surface the error.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const suffix = generateDraftSuffix();
+    const draft: ProductInput = {
+      sku: `DDS-DRAFT-${suffix.toUpperCase()}`,
+      slug: `draft-${suffix.toLowerCase()}`,
+      name: "Untitled draft",
+      description: null,
+      brand: null,
+      price_pence: 0,
+      was_price_pence: null,
+      cost_price_pence: null,
+      stock_quantity: 0,
+      low_stock_alert: null,
+      warehouse_location: null,
+      status: "draft",
+      weight_kg: null,
+      dimensions: null,
+      condition: "new",
+      condition_grade: null,
+      condition_notes: null,
+      source: null,
+      refurb_date: null,
+      tags: [],
+      specifications: null,
+    };
+
+    // Validate via productSchema so the same gate applies as createProduct.
+    const parsed = productSchema.safeParse(draft);
+    if (!parsed.success) {
+      return {
+        ok: false,
+        formError: "Internal: draft skeleton failed schema validation",
+      };
+    }
+
+    const { data, error } = await supabase
+      .from("products")
+      .insert(parsed.data)
+      .select("id")
+      .single();
+
+    if (!error) {
+      revalidatePath("/admin/products");
+      return { ok: true, id: data.id };
+    }
+
+    // SKU unique violation — try again with a new suffix.
+    const fieldErrors = uniqueViolationToFieldErrors(error);
+    if (fieldErrors?.sku && attempt === 0) {
+      continue;
+    }
+
+    return { ok: false, formError: error.message };
+  }
+
+  return { ok: false, formError: "Could not generate a unique draft SKU" };
+}
+
+/**
+ * Generate a 6-character alphanumeric suffix for draft SKU/slug pairs.
+ * Uses crypto.getRandomValues for good entropy (lazy import to keep this
+ * file Node-friendly outside the Next.js runtime).
+ */
+function generateDraftSuffix(): string {
+  const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
+  const bytes = new Uint8Array(6);
+  crypto.getRandomValues(bytes);
+  let out = "";
+  for (const byte of bytes) {
+    out += alphabet[byte % alphabet.length];
+  }
+  return out;
+}
+
 export async function createProduct(input: ProductInput): Promise<ActionResult> {
   const parsed = productSchema.safeParse(input);
   if (!parsed.success) {
