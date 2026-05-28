@@ -46,10 +46,18 @@ type ApplyActionResult =
  * because model + suggested_at are stamped server-side, not asked for.
  */
 const claudeResponseSchema = z.object({
+  // Enrichment (existing)
   alt: z.string().min(1).max(500),
   tags: z.array(z.string().min(1).max(50)).max(20),
   category_ids: z.array(z.string().uuid()).max(20),
   condition_observations: z.array(z.string().min(1).max(300)).max(20),
+  // Drafted-from-photo (Branch 1 — model may return null when it can't
+  // infer confidently; .optional() lets older prompts/clients omit them
+  // entirely without breaking parsing).
+  name: z.string().min(4).max(120).nullable().optional(),
+  description: z.string().min(10).max(1200).nullable().optional(),
+  brand: z.string().min(1).max(100).nullable().optional(),
+  condition_grade: z.enum(["A", "B", "C"]).nullable().optional(),
 });
 
 export async function suggestImageMetadata(
@@ -160,12 +168,18 @@ export async function suggestImageMetadata(
     validCategoryIds.has(id)
   );
 
-  // 5. Build the suggestion record and write it back.
+  // 5. Build the suggestion record and write it back. Normalise the
+  // drafted fields' undefined → null at the boundary so Branch 2 (UI)
+  // reads a consistent shape from product_images.ai_suggestions.
   const suggestion: AiSuggestion = {
     alt: parsed.alt,
     tags: parsed.tags,
     category_ids: validCategoryIdsFromClaude,
     condition_observations: parsed.condition_observations,
+    name: parsed.name ?? null,
+    description: parsed.description ?? null,
+    brand: parsed.brand ?? null,
+    condition_grade: parsed.condition_grade ?? null,
     model: VISION_MODEL,
     suggested_at: new Date().toISOString(),
   };
