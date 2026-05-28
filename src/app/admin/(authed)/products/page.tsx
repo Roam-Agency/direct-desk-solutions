@@ -5,6 +5,8 @@ import { formatPence } from "@/lib/products/format";
 import type { Database } from "@/types/database";
 import { SectionHeader } from "../_ui/SectionHeader";
 import { StatusPill } from "../_ui/StatusPill";
+import { ProductGallery } from "./_ProductGallery";
+import { ViewSwitcher } from "./_ViewSwitcher";
 
 type ProductRow = Database["public"]["Tables"]["products"]["Row"];
 type StatusFilter = "all" | "live" | "draft" | "archived";
@@ -121,7 +123,10 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         ) : !products || products.length === 0 ? (
           <EmptyState />
         ) : (
-          <ProductTable rows={products} heroByProductId={heroByProductId} />
+          <ViewSwitcher
+            table={<ProductTable rows={products} heroByProductId={heroByProductId} />}
+            gallery={<ProductGallery rows={products} heroByProductId={heroByProductId} />}
+          />
         )}
       </div>
     </div>
