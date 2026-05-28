@@ -64,12 +64,13 @@ export default function PublicHeader() {
       <header className="sticky top-0 z-40 bg-paper border-b border-rule">
         <div className="mx-auto max-w-7xl px-6 h-16 flex items-center justify-between">
           <Link href="/" aria-label="Direct Desk Solutions home" className="block">
-            {/* Responsive logo sizing via arbitrary-variant child selectors.
-                Base 28px (mobile), 36px from md, 40px from lg. width:auto lets
-                the SVG's 340:110 intrinsic aspect ratio hold. */}
-            <span className="block [&>svg]:h-7 md:[&>svg]:h-9 lg:[&>svg]:h-10 [&>svg]:w-auto">
-              <Logo size={28} variant="dark" />
-            </span>
+            {/* Responsive logo sizing: 28px (mobile), 36px from md, 40px from
+                lg. width:auto keeps the artwork's intrinsic aspect ratio. */}
+            <Logo
+              variant="dark"
+              preload
+              className="block h-7 md:h-9 lg:h-10 w-auto"
+            />
           </Link>
           {/* Desktop horizontal nav at lg+. Hidden below. */}
           <nav
@@ -130,7 +131,7 @@ export default function PublicHeader() {
           className="fixed inset-0 z-50 bg-ink text-white flex flex-col"
         >
           <div className="px-6 h-16 flex items-center justify-between border-b border-white/10 flex-shrink-0">
-            <Logo size={28} variant="light" />
+            <Logo variant="light" className="h-7 w-auto" />
             <button
               ref={closeButtonRef}
               type="button"

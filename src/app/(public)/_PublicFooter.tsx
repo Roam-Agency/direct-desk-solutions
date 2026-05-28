@@ -8,7 +8,7 @@ export default function PublicFooter() {
         <div className="flex flex-col gap-10 sm:flex-row sm:items-start sm:justify-between sm:gap-12">
           {/* Logo + tagline */}
           <div className="sm:max-w-xs">
-            <Logo size={28} variant="light" />
+            <Logo variant="light" className="h-7 w-auto" />
             <p className="mt-4 text-sm leading-relaxed text-stone-400">
               New and pre-owned office furniture, delivered UK-wide from
               our Darlington workshop.
