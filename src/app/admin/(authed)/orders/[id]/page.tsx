@@ -399,6 +399,9 @@ export default async function OrderDetailPage({ params }: OrderPageProps) {
         orderId={order.id}
         status={order.status}
         initialNotes={order.notes ?? ""}
+        totalPence={order.total_pence}
+        refundedPence={order.refunded_pence}
+        hasPaymentIntent={Boolean(order.stripe_payment_intent)}
       />
     </div>
   );
