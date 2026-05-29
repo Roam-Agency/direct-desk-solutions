@@ -4,11 +4,11 @@ import Breadcrumb from "@/app/(public)/_Breadcrumb";
 export const metadata: Metadata = {
   title: "About | Direct Desk Solutions",
   description:
-    "Direct Desk Solutions Ltd — a Darlington-based office furniture company supplying new stock and curated, refurbished premium pre-owned items UK-wide.",
+    "A Darlington-based office furniture company. Quality new stock and properly refurbished pre-owned pieces, honestly described and delivered UK-wide.",
   openGraph: {
     title: "About | Direct Desk Solutions",
     description:
-      "Direct Desk Solutions Ltd — a Darlington-based office furniture company supplying new stock and curated, refurbished premium pre-owned items UK-wide.",
+      "A Darlington-based office furniture company. Quality new stock and properly refurbished pre-owned pieces, honestly described and delivered UK-wide.",
     type: "website",
     images: [
       {
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "About | Direct Desk Solutions",
     description:
-      "Direct Desk Solutions Ltd — a Darlington-based office furniture company supplying new stock and curated, refurbished premium pre-owned items UK-wide.",
+      "A Darlington-based office furniture company. Quality new stock and properly refurbished pre-owned pieces, honestly described and delivered UK-wide.",
     images: ["/og-default.png"],
   },
 };
@@ -43,10 +43,10 @@ export default function AboutPage() {
             honestly described.
           </h1>
           <p className="mt-6 max-w-2xl text-base sm:text-lg text-paper/70 leading-relaxed">
-            Direct Desk Solutions Ltd is a Darlington-based office furniture
-            company. We supply new stock and a curated catalogue of
-            refurbished premium pre-owned items — Herman Miller, Steelcase,
-            Vitra and others — delivered across the UK.
+            A Darlington-based office furniture company. We supply quality
+            new stock and a catalogue of properly refurbished pre-owned
+            pieces — every one honestly described and delivered across the
+            UK.
           </p>
         </div>
       </section>
@@ -74,9 +74,9 @@ export default function AboutPage() {
                   Currently a placeholder framing. */}
               <p className="text-base text-ink/80 leading-relaxed mb-4">
                 Direct Desk Solutions was founded by William Birch to do
-                one thing properly: source, refurbish and supply premium
-                office furniture without the markup or mystery that comes
-                with the bigger generic dealers.
+                one thing properly: source, refurbish and supply good
+                office furniture — new or pre-owned — without the markup
+                or the mystery you get from the bigger dealers.
               </p>
               <p className="text-base text-ink/80 leading-relaxed">
                 We operate from a workshop in Darlington, North East
@@ -94,8 +94,8 @@ export default function AboutPage() {
               <p className="text-base text-ink/80 leading-relaxed mb-4">
                 New stock for the buyer kitting out a fresh space — desks,
                 task chairs, storage, meeting tables, acoustic booths.
-                Pre-owned for the buyer who wants a Herman Miller Aeron or
-                a Steelcase Think for the price of a generic mesh chair.
+                Pre-owned for the buyer who wants a properly built chair
+                or desk for a fraction of the price of equivalent new.
               </p>
               <p className="text-base text-ink/80 leading-relaxed">
                 Every refurbished item is professionally inspected,
@@ -110,20 +110,21 @@ export default function AboutPage() {
                 Why pre-owned matters
               </p>
               <h2 className="text-2xl sm:text-3xl font-black tracking-tight mb-5">
-                The premium chair already exists.
+                The good stuff already exists.
               </h2>
               <p className="text-base text-ink/80 leading-relaxed mb-4">
-                A Herman Miller Aeron is built to last twenty-plus years.
+                A well-made task chair or desk is built to last decades.
                 Most spend their first life in a corporate office and end
                 their service when the company refurbishes, relocates, or
-                downsizes. The chair isn{"'"}t worn out — the lease just
-                ended.
+                downsizes. The furniture isn{"'"}t worn out — the lease
+                just ended.
               </p>
               <p className="text-base text-ink/80 leading-relaxed">
                 We source these clearances, refurbish them properly, and
-                pass on the price difference. A new Aeron is £1,495 RRP.
-                Ours start at £645. The buyer gets the chair they
-                actually want; the chair stays out of landfill.
+                pass the saving on — quality pieces for a fraction of the
+                price of equivalent new. You get furniture that actually
+                lasts; it stays out of landfill. Everyone wins but the
+                skip.
               </p>
             </article>
 
@@ -150,7 +151,8 @@ export default function AboutPage() {
                   invoice terms, account opening process. Mention here
                   once defined. */}
               <p className="text-base text-ink/80 leading-relaxed">
-                UK-wide delivery. We&rsquo;ll respond within one working day.
+                Free UK mainland delivery, and a real person on the other
+                end — we&rsquo;ll get back to you within one working day.
               </p>
             </article>
           </div>
