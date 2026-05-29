@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, Suspense } from "react";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import logoDark from "@/assets/brand/dds-logo-dark.png";
 
 function LoginForm() {
   const router = useRouter();
@@ -97,14 +99,13 @@ export default function LoginPage() {
     <main className="min-h-screen bg-paper flex items-center justify-center px-6 py-12">
       <div className="w-full max-w-sm">
         <div className="mb-10 text-center">
-          <div className="inline-block">
-            <span className="text-2xl font-black tracking-tight text-ink">
-              Direct Desk
-            </span>
-            <span className="text-2xl font-black tracking-tight text-brand-red">
-              .
-            </span>
-          </div>
+          {/* Brand logo (dark variant for the light bg-paper page) */}
+          <Image
+            src={logoDark}
+            alt="Direct Desk Solutions"
+            preload
+            className="mx-auto block h-10 w-auto"
+          />
           <p className="mt-3 text-xs font-bold uppercase tracking-widest text-ink/60">
             Admin
           </p>
