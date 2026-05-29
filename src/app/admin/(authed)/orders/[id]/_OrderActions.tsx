@@ -4,13 +4,18 @@ import { useState, useTransition } from "react";
 import {
   markFulfilled,
   markPending,
+  refundOrder,
   updateOrderNotes,
 } from "./_actions";
+import { formatPence } from "@/lib/products/format";
 
 interface OrderActionsProps {
   orderId: string;
   status: string;
   initialNotes: string;
+  totalPence: number;
+  refundedPence: number;
+  hasPaymentIntent: boolean;
 }
 
 /**
@@ -31,6 +36,9 @@ export default function OrderActions({
   orderId,
   status,
   initialNotes,
+  totalPence,
+  refundedPence,
+  hasPaymentIntent,
 }: OrderActionsProps) {
   const [isPending, startTransition] = useTransition();
   const [notes, setNotes] = useState(initialNotes);
@@ -39,9 +47,43 @@ export default function OrderActions({
     message: string;
   } | null>(null);
   const [fulfilFeedback, setFulfilFeedback] = useState<string | null>(null);
+  const [confirmingRefund, setConfirmingRefund] = useState(false);
+  const [refundFeedback, setRefundFeedback] = useState<{
+    kind: "submitted" | "error";
+    message: string;
+  } | null>(null);
 
   const isFulfillable = status === "paid";
   const isRevertable = status === "fulfilled";
+
+  // A full refund covers everything not already refunded. A prior partial
+  // refund (issued from the Stripe dashboard) leaves status paid/fulfilled
+  // with a non-zero refundedPence, so we surface the remainder.
+  const remainingPence = totalPence - refundedPence;
+  const canRefund =
+    hasPaymentIntent &&
+    (status === "paid" || status === "fulfilled") &&
+    remainingPence > 0;
+
+  function onConfirmRefund() {
+    setRefundFeedback(null);
+    startTransition(async () => {
+      const result = await refundOrder(orderId);
+      setConfirmingRefund(false);
+      if (result.ok) {
+        setRefundFeedback({
+          kind: "submitted",
+          message:
+            "Refund submitted — syncing from Stripe. Refresh in a moment to see it applied.",
+        });
+      } else {
+        setRefundFeedback({
+          kind: "error",
+          message: result.formError ?? "Could not issue the refund.",
+        });
+      }
+    });
+  }
 
   function onToggleFulfilled() {
     setFulfilFeedback(null);
@@ -70,6 +112,7 @@ export default function OrderActions({
   }
 
   return (
+    <div className="space-y-6">
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
       {/* Fulfilment toggle */}
       <div className="border border-rule bg-paper p-6">
@@ -151,6 +194,82 @@ export default function OrderActions({
                 : "mt-3 text-xs text-brand-red"
             }>
             {notesFeedback.message}
+          </p>
+        )}
+      </div>
+    </div>
+
+      {/* Refund (full) */}
+      <div className="border border-brand-red/40 bg-paper p-6">
+        <h2 className="text-xs font-bold uppercase tracking-widest text-brand-red">
+          Refund
+        </h2>
+        {canRefund ? (
+          <>
+            <p className="mt-4 text-sm text-ink/70">
+              Issue a full refund of{" "}
+              <span className="font-bold tabular-nums">
+                {formatPence(remainingPence)}
+              </span>{" "}
+              via Stripe.
+              {refundedPence > 0 && (
+                <>
+                  {" "}
+                  ({formatPence(refundedPence)} already refunded.)
+                </>
+              )}{" "}
+              This cannot be undone.
+            </p>
+            {!confirmingRefund ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setRefundFeedback(null);
+                  setConfirmingRefund(true);
+                }}
+                disabled={isPending}
+                className="mt-4 border border-brand-red bg-paper px-4 py-2 text-xs font-bold uppercase tracking-widest text-brand-red transition hover:bg-brand-red hover:text-paper disabled:opacity-50">
+                Refund {formatPence(remainingPence)}
+              </button>
+            ) : (
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <span className="text-sm font-bold text-ink">
+                  Refund {formatPence(remainingPence)} in full?
+                </span>
+                <button
+                  type="button"
+                  onClick={onConfirmRefund}
+                  disabled={isPending}
+                  className="border border-brand-red bg-brand-red px-4 py-2 text-xs font-bold uppercase tracking-widest text-paper transition hover:bg-ink hover:border-ink disabled:opacity-50">
+                  {isPending ? "Refunding…" : "Confirm refund"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingRefund(false)}
+                  disabled={isPending}
+                  className="border border-rule bg-paper px-4 py-2 text-xs font-bold uppercase tracking-widest text-ink transition hover:bg-ink hover:text-paper disabled:opacity-50">
+                  Cancel
+                </button>
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="mt-4 text-sm text-ink/40">
+            {!hasPaymentIntent
+              ? "This order has no Stripe payment intent and cannot be refunded here."
+              : remainingPence <= 0 && refundedPence > 0
+                ? "This order has been fully refunded."
+                : `No refund action available for status “${status}”.`}
+          </p>
+        )}
+        {refundFeedback && (
+          <p
+            className={
+              refundFeedback.kind === "submitted"
+                ? "mt-3 text-xs text-ink/60"
+                : "mt-3 text-xs text-brand-red"
+            }>
+            {refundFeedback.message}
           </p>
         )}
       </div>

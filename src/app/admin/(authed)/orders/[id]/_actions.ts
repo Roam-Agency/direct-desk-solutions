@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getStripe } from "@/lib/stripe/server";
 
 /**
  * Server Actions for the order detail page.
@@ -16,9 +17,14 @@ import { createClient } from "@/lib/supabase/server";
  * Each action revalidates both list and detail paths on success so
  * the admin sees state changes immediately on next render.
  *
- * Note: refunds are not exposed as an action here. The Stripe webhook
- * syncs refunded_pence back from dashboard refunds (Brief 17/18). In-
- * app refunds are queued for a later brief (Brief 19 §5).
+ * Refunds (refundOrder): this action only CREATES the refund at Stripe.
+ * The resulting charge.refunded webhook is the single owner of the DB
+ * side-effects - it mirrors refunded_pence, flips status to 'refunded'
+ * on a full refund, and restocks items, all idempotently (see
+ * lib/checkout/process-payment.ts processRefund). We deliberately do not
+ * write refunded_pence here to avoid two code paths fighting over the
+ * same field; the trade-off is a few seconds of UI lag until the webhook
+ * lands.
  */
 
 type ActionResult =
@@ -150,6 +156,90 @@ export async function markPending(
     };
   }
 
+  revalidateOrder(orderId);
+  return { ok: true };
+}
+
+/**
+ * Issue a FULL refund for an order via Stripe.
+ *
+ * "Full" means the entire outstanding amount: total_pence minus anything
+ * already refunded (a prior partial refund issued from the Stripe
+ * dashboard leaves status paid/fulfilled but a non-zero refunded_pence,
+ * so we refund only the remainder). The charge.refunded webhook then
+ * mirrors refunded_pence, flips status to 'refunded', and restocks.
+ *
+ * Guards:
+ *   - order must exist and carry a stripe_payment_intent (older/manual
+ *     orders without one cannot be refunded through here)
+ *   - status must be paid or fulfilled (refunded/cancelled/backorder
+ *     take other paths)
+ *   - if already fully refunded, no-op ok (a refresh races the webhook)
+ *
+ * Idempotency: we pass a Stripe idempotency key keyed on the order id +
+ * the refunded_pence we observed, so a double-submit from the same state
+ * collapses to a single refund rather than stacking two.
+ */
+export async function refundOrder(
+  orderId: string
+): Promise<ActionResult> {
+  const supabase = await createClient();
+
+  const { data: order, error: readError } = await supabase
+    .from("orders")
+    .select("status, total_pence, refunded_pence, stripe_payment_intent")
+    .eq("id", orderId)
+    .single();
+
+  if (readError || !order) {
+    return {
+      ok: false,
+      formError: "Could not find the order. It may have been deleted.",
+    };
+  }
+
+  if (!order.stripe_payment_intent) {
+    return {
+      ok: false,
+      formError:
+        "This order has no Stripe payment intent and cannot be refunded here.",
+    };
+  }
+
+  if (order.status !== "paid" && order.status !== "fulfilled") {
+    return {
+      ok: false,
+      formError: `Cannot refund an order with status ${order.status}.`,
+    };
+  }
+
+  const remaining = order.total_pence - order.refunded_pence;
+  if (remaining <= 0) {
+    // Already fully refunded. Treat as a no-op so a click that races the
+    // webhook (which will have set status to 'refunded') doesn't error.
+    revalidateOrder(orderId);
+    return { ok: true };
+  }
+
+  try {
+    await getStripe().refunds.create(
+      {
+        payment_intent: order.stripe_payment_intent,
+        amount: remaining,
+      },
+      { idempotencyKey: `refund-${orderId}-${order.refunded_pence}` }
+    );
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Unknown error from Stripe.";
+    return {
+      ok: false,
+      formError: `Stripe refund failed: ${message}`,
+    };
+  }
+
+  // The webhook owns the DB write; revalidate so the page re-reads once
+  // refunded_pence/status land.
   revalidateOrder(orderId);
   return { ok: true };
 }
