@@ -26,6 +26,21 @@ export default async function AdminLayout({
     redirect("/admin/login");
   }
 
+  // Roles gate. A valid Supabase session is necessary but NOT sufficient:
+  // the user must also have a row in admin_users. This is what lets us
+  // invite people (they set their own password via Supabase) and only
+  // grant admin access once they have a role row. Fail closed - no row
+  // means no access, even with a valid session.
+  const { data: adminRow } = await supabase
+    .from("admin_users")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!adminRow) {
+    redirect("/admin/login?error=no-access");
+  }
+
   return (
     <div className="min-h-screen bg-paper text-ink lg:flex">
       <AdminSidebar userEmail={user.email ?? ""} />
