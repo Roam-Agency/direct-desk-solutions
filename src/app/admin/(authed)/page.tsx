@@ -5,6 +5,7 @@ import { SectionHeader } from "./_ui/SectionHeader";
 import { StatCard } from "./_ui/StatCard";
 import { StatusPill } from "./_ui/StatusPill";
 import { DashboardDropZone } from "./_DashboardDropZone";
+import { getFinancialOverview } from "./_financial";
 
 /**
  * Admin dashboard — daily-driver landing page.
@@ -140,6 +141,11 @@ export default async function AdminDashboard() {
     };
   });
 
+  // Financial overview: sales from orders, cash from Stripe. The Stripe
+  // half is isolated inside getFinancialOverview and can never reject,
+  // so a processor outage degrades to a null cash group, not a 500.
+  const financial = await getFinancialOverview();
+
   return (
     <div>
       {/* Brand masthead — sentence-style identity line above the page title */}
@@ -189,6 +195,84 @@ export default async function AdminDashboard() {
           sublabel={lowStockCount > 0 ? "Below threshold" : undefined}
         />
       </div>
+
+      {/* Block B2 — Financial overview */}
+      <div className="mt-12 pb-4 border-b-2 border-ink">
+        <p className="text-xs font-bold uppercase tracking-widest text-ink/60">
+          Money
+        </p>
+        <h2 className="mt-1 text-2xl font-black tracking-tight text-ink">
+          Financial overview
+        </h2>
+      </div>
+
+      {financial.testMode || financial.cash === null ? (
+        <div className="mt-6 border-l-2 border-brand-red bg-rule/20 px-4 py-3">
+          <p className="text-xs font-bold uppercase tracking-widest text-ink">
+            {financial.cash === null
+              ? "Cash data unavailable"
+              : "Stripe test mode"}
+          </p>
+          <p className="mt-1 text-sm text-ink/70">
+            {financial.cash === null
+              ? "Could not reach Stripe for live balance and payout figures. Sales figures below are read from orders and are unaffected."
+              : "Cash figures below are Stripe test data, not real money. They go live automatically once the production key is in place."}
+          </p>
+        </div>
+      ) : null}
+
+      {/* Sales — from orders table */}
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label={`Net revenue ${financial.sales.windowDays}d`}
+          value={formatPence(financial.sales.netPence)}
+          sublabel="Gross less refunds"
+        />
+        <StatCard
+          label={`Gross sales ${financial.sales.windowDays}d`}
+          value={formatPence(financial.sales.grossPence)}
+          sublabel={`${financial.sales.paidOrderCount} paid ${
+            financial.sales.paidOrderCount === 1 ? "order" : "orders"
+          }`}
+        />
+        <StatCard
+          label={`Refunds ${financial.sales.windowDays}d`}
+          value={formatPence(financial.sales.refundsPence)}
+        />
+        <StatCard
+          label="Avg order value"
+          value={formatPence(financial.sales.avgOrderPence)}
+        />
+      </div>
+
+      {/* Cash — from Stripe. Only rendered when available. */}
+      {financial.cash !== null ? (
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            label="Stripe available"
+            value={formatPence(financial.cash.availablePence)}
+            sublabel="Ready to pay out"
+          />
+          <StatCard
+            label="Stripe pending"
+            value={formatPence(financial.cash.pendingPence)}
+            sublabel="Clearing"
+          />
+          <StatCard
+            label="Last payout"
+            value={
+              financial.cash.lastPayoutPence !== null
+                ? formatPence(financial.cash.lastPayoutPence)
+                : "—"
+            }
+            sublabel={
+              financial.cash.lastPayoutArrival
+                ? `Arrived ${formatTimeAgo(financial.cash.lastPayoutArrival)}`
+                : undefined
+            }
+          />
+        </div>
+      ) : null}
 
       {/* Block C — Recent activity */}
       <div className="mt-12 grid gap-8 lg:grid-cols-2">
