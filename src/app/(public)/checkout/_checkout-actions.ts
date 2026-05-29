@@ -10,6 +10,7 @@ import {
   SHIPPING_ALLOWED_COUNTRIES,
   STOCK_RESERVATION_TTL_MINUTES,
 } from "@/lib/stripe/constants";
+import { getAppSettings } from "@/lib/settings/fetch";
 
 /**
  * Stripe Checkout session creation.
@@ -193,11 +194,17 @@ export async function createCheckoutSession(
   }
 
   // ---- 4. Compute totals + shipping --------------------------------------
+  // Read the site-wide free-shipping switch (admin-managed flash sales). When
+  // active, every order ships free regardless of subtotal. getAppSettings()
+  // falls back to safe defaults on error, so checkout never breaks on this.
+  const settings = await getAppSettings();
   const subtotalPence = lineItems.reduce(
     (sum, l) => sum + l.pricePence * l.qty,
     0
   );
-  const shippingPence = computeShippingPence(subtotalPence);
+  const shippingPence = computeShippingPence(subtotalPence, {
+    freeShippingActive: settings.free_shipping_active,
+  });
 
   // ---- 5. Build Stripe line_items ----------------------------------------
   // One Stripe line per cart line. We include slug + brand + condition in
@@ -264,8 +271,11 @@ export async function createCheckoutSession(
               amount: shippingPence,
               currency: "gbp",
             },
-            display_name:
-              shippingPence === 0 ? "Free UK delivery" : "UK delivery",
+            display_name: settings.free_shipping_active
+              ? "Free UK delivery (sale)"
+              : shippingPence === 0
+                ? "Free UK delivery"
+                : "UK delivery",
             delivery_estimate: {
               minimum: { unit: "business_day", value: 2 },
               maximum: { unit: "business_day", value: 5 },

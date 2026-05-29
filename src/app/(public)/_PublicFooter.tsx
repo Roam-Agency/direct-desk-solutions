@@ -1,7 +1,12 @@
 import Link from "next/link";
 import Logo from "./_Logo";
+import { getAppSettings } from "@/lib/settings/fetch";
 
-export default function PublicFooter() {
+export default async function PublicFooter() {
+  const settings = await getAppSettings();
+  const contactEmail = settings.contact_email;
+  const freeDeliveryMessage = settings.free_delivery_message.trim();
+
   return (
     <footer className="bg-ink text-white">
       <div className="mx-auto max-w-7xl px-6 py-12 sm:py-16">
@@ -14,6 +19,11 @@ export default function PublicFooter() {
               described and delivered UK-wide from our Darlington
               workshop.
             </p>
+            {freeDeliveryMessage && (
+              <p className="mt-4 text-xs font-bold uppercase tracking-[0.18em] text-brand-red">
+                {freeDeliveryMessage}
+              </p>
+            )}
           </div>
 
           {/* Why DDS link column — surfaces the three trust pages
@@ -45,10 +55,10 @@ export default function PublicFooter() {
           {/* Contact */}
           <div className="flex flex-col gap-3 text-xs uppercase tracking-[0.18em] sm:items-end">
             <a
-              href="mailto:info@directdesksolutions.com"
+              href={`mailto:${contactEmail}`}
               className="font-bold border-b-2 border-white pb-1 hover:opacity-70 transition-opacity self-start sm:self-auto"
             >
-              info@directdesksolutions.com
+              {contactEmail}
             </a>
             <p className="text-[10px] tracking-[0.2em] text-stone-600">
               © 2026 Direct Desk Solutions Ltd
