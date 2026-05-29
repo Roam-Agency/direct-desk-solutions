@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import SplitTile from "./products/_SplitTile";
-import BrandTile from "./brands/_BrandTile";
+import ListingCard from "./products/_ListingCard";
 import {
   countLiveProductsByCondition,
-  listBrandsWithCounts,
+  listLiveProducts,
 } from "@/lib/products/fetch";
 
 // BRIEF_12_SESSION_6_MARKER — homepage redesign, Phase 3 P0.
@@ -13,15 +13,19 @@ import {
 export const metadata: Metadata = {
   title: "Direct Desk Solutions — Office furniture, honestly described",
   description:
-    "New and refurbished premium office furniture — Herman Miller, Steelcase, Vitra. Every used piece comes with a full condition report. Delivered across the UK.",
+    "New and refurbished office furniture, honestly described and built to last. From a single desk to a full fit-out, with free UK mainland delivery on every order.",
 };
 
 export default async function PublicHomePage() {
   // Fetch in parallel — both helpers hit Supabase independently.
-  const [counts, brands] = await Promise.all([
+  // The 'Just in' reel shows the newest used products (the core of the
+  // business). listLiveProducts returns newest-first by default; we take
+  // the first three to match the section's three-up layout.
+  const [counts, latestUsed] = await Promise.all([
     countLiveProductsByCondition(),
-    listBrandsWithCounts(),
+    listLiveProducts({ condition: "used" }),
   ]);
+  const reelProducts = latestUsed.slice(0, 3);
 
   return (
     <>
@@ -39,15 +43,15 @@ export default async function PublicHomePage() {
         <div className="absolute inset-0 bg-ink/80" aria-hidden="true" />
         <div className="relative z-10 mx-auto max-w-7xl px-6 py-20 sm:py-28 lg:py-36">
           <p className="text-[10px] uppercase tracking-[0.28em] text-brand-red font-bold mb-6">
-            Direct Desk Solutions
+            New &amp; refurbished office furniture
           </p>
           <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight leading-[0.95] mb-8 max-w-4xl">
-            Office furniture,
+            Your workspace,
             <br />
-            honestly described.
+            sorted properly.
           </h1>
           <p className="text-base sm:text-lg text-paper/70 leading-relaxed mb-10 max-w-xl">
-            A curated catalogue of refurbished premium chairs and desks — Herman Miller, Steelcase, Vitra. Professionally restored in our UK workshop, every piece sold with a full condition report so you know exactly what you&apos;re buying. New stock available too.
+            From a single chair to a full office fit-out — quality furniture, refurbished in our own UK workshop or supplied new, always honestly described. Free UK delivery, fair prices, and friendly help whenever you need it.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 sm:items-center">
             <Link
@@ -82,7 +86,7 @@ export default async function PublicHomePage() {
               href="/products/used"
               eyebrow="The DDS difference"
               title="Shop Used"
-              blurb="Premium pre-owned chairs and desks from Herman Miller, Steelcase, Vitra. Professionally refurbished in our UK workshop, every piece with a full condition report. Trade-clearance prices on furniture built to last decades."
+              blurb="Professionally refurbished chairs and desks, restored in our UK workshop and sold with a full condition report. Built to last decades, priced like they have only been used once."
               count={counts.used}
               accent="red"
             />
@@ -100,37 +104,31 @@ export default async function PublicHomePage() {
         </div>
       </section>
 
-      {/* ===== 3. Brand shortcuts ===== */}
-      {brands.length > 0 && (
+      {/* ===== 3. Just in — newest used products reel ===== */}
+      {reelProducts.length > 0 && (
         <section className="bg-paper border-t border-rule">
           <div className="mx-auto max-w-7xl px-6 py-16 lg:py-24">
             <div className="mb-10 lg:mb-14 flex items-end justify-between">
               <div>
                 <p className="text-[10px] uppercase tracking-[0.22em] font-bold text-ink/60 mb-3">
-                  Brands
+                  Just in
                 </p>
                 <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-[0.95]">
-                  Premium, refurbished.
+                  Fresh off the workshop floor.
                 </h2>
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {brands.map((b, i) => (
-                <BrandTile
-                  key={b.id}
-                  slug={b.slug}
-                  name={b.name}
-                  count={b.live_product_count}
-                  imageIndex={i}
-                />
+              {reelProducts.map((product) => (
+                <ListingCard key={product.id} product={product} />
               ))}
             </div>
             <div className="mt-10 lg:mt-12">
               <Link
-                href="/brands"
+                href="/products/used"
                 className="inline-flex items-center text-xs uppercase tracking-[0.18em] font-bold border-b-2 border-ink pb-1 hover:opacity-70 transition-opacity"
               >
-                View all brands →
+                View all used stock →
               </Link>
             </div>
           </div>
