@@ -10,8 +10,9 @@ export default function PublicFooter() {
           <div className="sm:max-w-xs">
             <Logo variant="light" className="h-7 w-auto" />
             <p className="mt-4 text-sm leading-relaxed text-stone-400">
-              New and pre-owned office furniture, delivered UK-wide from
-              our Darlington workshop.
+              Quality office furniture, new and refurbished — honestly
+              described and delivered UK-wide from our Darlington
+              workshop.
             </p>
           </div>
 
