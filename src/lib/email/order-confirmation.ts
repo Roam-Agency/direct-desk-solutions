@@ -23,14 +23,17 @@ import { getResend } from "@/lib/email/client";
 
 // ─────────────────────────────────────────────────────────────
 // CONFIG CONSTANTS — swap real values here.
-// LOGO_URL: replace with the permanent Cloudinary URL once uploaded.
-// Repo-committed / GitHub-raw URLs are fragile for email; Cloudinary
-// is the right home. Placeholder below is the GitHub raw fallback.
 // ─────────────────────────────────────────────────────────────
 const FROM_ADDRESS = "Direct Desk Solutions <orders@directdesksolutions.com>";
 const REPLY_TO = "info@directdesksolutions.com";
-const LOGO_URL =
-  "https://res.cloudinary.com/direct-desk-solutions/image/upload/dds-logo-email.png";
+// Email clients need an absolute URL for the logo. We serve it from this
+// app's own /public folder (public/email-logo.png) so there's no external
+// dependency — it follows NEXT_PUBLIC_SITE_URL the same way metadataBase
+// does (see app/layout.tsx), falling back to the Netlify deploy host.
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ??
+  "https://direct-desk-solutionse.netlify.app";
+const LOGO_URL = `${SITE_URL.replace(/\/$/, "")}/email-logo.png`;
 const SHOP_URL = "https://www.directdesksolutions.com";
 
 const BRAND_RED = "#E5202A";
