@@ -118,6 +118,12 @@ type CartContextValue = {
   openDrawer: () => void;
   closeDrawer: () => void;
   toggleDrawer: () => void;
+  // Transient marketing-consent opt-in captured on /cart and read on
+  // /checkout. Deliberately NOT in the reducer and NOT persisted to
+  // localStorage: a returning buyer must re-choose each session rather
+  // than inherit a stale opt-in (GDPR: consent must be fresh + explicit).
+  marketingConsent: boolean;
+  setMarketingConsent: (value: boolean) => void;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -125,6 +131,7 @@ const CartContext = createContext<CartContextValue | null>(null);
 export function CartProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
   const [isDrawerOpen, setDrawerOpen] = useState(false);
+  const [marketingConsent, setMarketingConsent] = useState(false);
 
   // Hydration: read localStorage on mount, dispatch HYDRATE. This is the
   // pattern that dodges React 19's SSR/CSR mismatch — both server and
@@ -196,6 +203,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       openDrawer,
       closeDrawer,
       toggleDrawer,
+      marketingConsent,
+      setMarketingConsent,
     }),
     [
       state.items,
@@ -208,6 +217,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       openDrawer,
       closeDrawer,
       toggleDrawer,
+      marketingConsent,
     ],
   );
 

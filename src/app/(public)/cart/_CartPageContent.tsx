@@ -37,7 +37,14 @@ type RefreshState = Record<
 >;
 
 export default function CartPageContent() {
-  const { items, mounted, removeItem, setQty } = useCart();
+  const {
+    items,
+    mounted,
+    removeItem,
+    setQty,
+    marketingConsent,
+    setMarketingConsent,
+  } = useCart();
   const [refresh, setRefresh] = useState<RefreshState>({});
 
   // Refresh on mount once we have hydrated cart items to send.
@@ -202,6 +209,22 @@ export default function CartPageContent() {
               {formatPence(livePence)}
             </span>
           </div>
+          {/* Marketing opt-in. Pre-unticked and unbundled from the
+              purchase: the buyer can check out with it on or off. UK
+              GDPR wants consent to be a clear, affirmative, separate
+              choice - never a precondition of buying. */}
+          <label className="flex items-start gap-3 mb-6 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={marketingConsent}
+              onChange={(e) => setMarketingConsent(e.target.checked)}
+              className="mt-0.5 h-4 w-4 flex-shrink-0 appearance-none border border-ink/40 bg-paper checked:bg-ink checked:border-ink focus:outline-none focus:ring-2 focus:ring-ink/30 transition-colors"
+            />
+            <span className="text-xs text-ink/70 leading-relaxed">
+              Email me about new stock and offers. No spam, just the good
+              kit. Unsubscribe anytime.
+            </span>
+          </label>
           <Link
             href="/checkout"
             className="block w-full bg-brand-red text-paper text-[11px] uppercase tracking-[0.22em] font-bold py-4 text-center hover:bg-ink transition-colors"

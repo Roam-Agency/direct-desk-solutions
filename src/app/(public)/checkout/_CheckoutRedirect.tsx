@@ -48,7 +48,7 @@ type Status =
 
 export default function CheckoutRedirect() {
   const router = useRouter();
-  const { items, mounted } = useCart();
+  const { items, mounted, marketingConsent } = useCart();
   // Default to "redirecting" since that is what the buyer should see
   // the moment the cart hydrates and we kick off the action. Starting
   // in "idle" would force a synchronous setState inside the effect to
@@ -78,7 +78,7 @@ export default function CheckoutRedirect() {
       qty: i.qty,
     }));
 
-    createCheckoutSession(payload)
+    createCheckoutSession(payload, marketingConsent)
       .then((result) => {
         if (result.ok) {
           // Full-document navigation. router.push would not work here -
@@ -114,7 +114,7 @@ export default function CheckoutRedirect() {
             "We could not open the secure payment page. Please try again.",
         });
       });
-  }, [mounted, items, router]);
+  }, [mounted, items, router, marketingConsent]);
 
   // Retry handler: reset the ref guard and restore the redirecting
   // state so the effect picks up on the next render. setStatus here
