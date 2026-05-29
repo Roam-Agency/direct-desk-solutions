@@ -14,6 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_users: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          invited_by: string | null
+          role: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id: string
+          invited_by?: string | null
+          role: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          invited_by?: string | null
+          role?: string
+        }
+        Relationships: []
+      }
+      app_settings: {
+        Row: {
+          contact_email: string
+          default_warranty_terms: string
+          free_delivery_message: string
+          id: number
+          low_stock_threshold: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          contact_email?: string
+          default_warranty_terms?: string
+          free_delivery_message?: string
+          id?: number
+          low_stock_threshold?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          contact_email?: string
+          default_warranty_terms?: string
+          free_delivery_message?: string
+          id?: number
+          low_stock_threshold?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           created_at: string
