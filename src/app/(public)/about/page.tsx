@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Breadcrumb from "@/app/(public)/_Breadcrumb";
+import { getAppSettings } from "@/lib/settings/fetch";
 
 export const metadata: Metadata = {
   title: "About | Direct Desk Solutions",
@@ -28,7 +29,8 @@ export const metadata: Metadata = {
   },
 };
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const { contact_email: contactEmail } = await getAppSettings();
   return (
     <>
       {/* Hero — black editorial band, matches /search and the homepage. */}
@@ -140,10 +142,10 @@ export default function AboutPage() {
                 specific models, planning a delivery to your floor:
                 {" "}
                 <a
-                  href="mailto:info@directdesksolutions.com"
+                  href={`mailto:${contactEmail}`}
                   className="font-bold border-b-2 border-ink hover:text-brand-red hover:border-brand-red transition-colors"
                 >
-                  info@directdesksolutions.com
+                  {contactEmail}
                 </a>
                 .
               </p>

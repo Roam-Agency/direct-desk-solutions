@@ -626,8 +626,19 @@ export async function processCheckoutCompleted(
   // ---------- 10. Build the email payload ----------
   // Everything below is already computed above; we just shape it for
   // the confirmation email. The route handler sends it best-effort.
+  //
+  // Reply-to uses the admin-configured contact email (app_settings). Best
+  // effort: if the read fails or the row is missing, replyTo stays null and
+  // the email module falls back to its own default.
+  const { data: settingsRow } = await admin
+    .from("app_settings")
+    .select("contact_email")
+    .eq("id", 1)
+    .maybeSingle();
+
   const emailPayload: OrderConfirmationPayload = {
     to: email,
+    replyTo: settingsRow?.contact_email ?? null,
     customerName: fullName || null,
     orderId,
     isBackorder,

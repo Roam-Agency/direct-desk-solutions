@@ -26,6 +26,9 @@ export function SettingsForm({ initialSettings }: Props) {
   const [contactEmail, setContactEmail] = useState(
     initialSettings.contact_email ?? ""
   );
+  const [warrantyTerms, setWarrantyTerms] = useState(
+    initialSettings.default_warranty_terms ?? ""
+  );
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -42,6 +45,7 @@ export function SettingsForm({ initialSettings }: Props) {
       free_delivery_message: freeDeliveryMessage.trim(),
       low_stock_threshold: parseInt(lowStockThreshold, 10) || 0,
       contact_email: contactEmail.trim(),
+      default_warranty_terms: warrantyTerms.trim(),
     };
 
     // Pre-validate client-side for instant feedback.
@@ -132,6 +136,25 @@ export function SettingsForm({ initialSettings }: Props) {
             value={lowStockThreshold}
             onChange={(e) => setLowStockThreshold(e.target.value)}
             className="w-full border border-rule bg-paper px-4 py-3 font-mono focus:border-brand-red focus:outline-none"
+          />
+        </Field>
+      </Section>
+
+      <Section
+        title="Warranty"
+        description="Default warranty terms applied to products and orders."
+      >
+        <Field
+          label="Default warranty terms"
+          error={fieldErrors.default_warranty_terms}
+          hint="The standard warranty wording used as the default across the catalogue. Leave blank if not applicable."
+        >
+          <textarea
+            value={warrantyTerms}
+            onChange={(e) => setWarrantyTerms(e.target.value)}
+            rows={4}
+            placeholder="12-month warranty on new items, 3-month warranty on refurbished items."
+            className="w-full border border-rule bg-paper px-4 py-3 focus:border-brand-red focus:outline-none"
           />
         </Field>
       </Section>

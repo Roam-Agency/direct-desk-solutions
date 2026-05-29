@@ -8,9 +8,7 @@ import { z } from "zod";
  *   - updateSettings Server Action (validates submitted form data)
  *   - <SettingsForm> component (derives the form's TypeScript types)
  *
- * Backs the singleton `app_settings` row (id = 1). `default_warranty_terms`
- * lives on the table but is not yet surfaced in the UI, so it is intentionally
- * absent here — updates leave its stored value untouched.
+ * Backs the singleton `app_settings` row (id = 1).
  */
 
 export const settingsSchema = z.object({
@@ -39,6 +37,13 @@ export const settingsSchema = z.object({
     .min(1, "Contact email is required")
     .email("Enter a valid email address")
     .max(200),
+
+  // Default warranty terms applied to products/orders.
+  default_warranty_terms: z
+    .string()
+    .trim()
+    .max(2000, "Keep warranty terms under 2000 characters")
+    .default(""),
 });
 
 export type SettingsInput = z.infer<typeof settingsSchema>;

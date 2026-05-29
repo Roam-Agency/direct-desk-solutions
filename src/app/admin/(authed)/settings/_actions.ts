@@ -64,6 +64,7 @@ export async function updateSettings(
       free_delivery_message: parsed.data.free_delivery_message,
       low_stock_threshold: parsed.data.low_stock_threshold,
       contact_email: parsed.data.contact_email,
+      default_warranty_terms: parsed.data.default_warranty_terms,
       updated_by: user?.id ?? null,
     },
     { onConflict: "id" }
