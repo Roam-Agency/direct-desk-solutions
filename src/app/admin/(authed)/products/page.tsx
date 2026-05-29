@@ -1,14 +1,11 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { DraftProductButton } from "./_DraftProductButton";
-import { formatPence } from "@/lib/products/format";
-import type { Database } from "@/types/database";
 import { SectionHeader } from "../_ui/SectionHeader";
-import { StatusPill } from "../_ui/StatusPill";
 import { ProductGallery } from "./_ProductGallery";
+import { ProductsTable } from "./_ProductsTable";
 import { ViewSwitcher } from "./_ViewSwitcher";
 
-type ProductRow = Database["public"]["Tables"]["products"]["Row"];
 type StatusFilter = "all" | "live" | "draft" | "archived";
 type ConditionFilter = "all" | "new" | "used";
 
@@ -124,7 +121,12 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           <EmptyState />
         ) : (
           <ViewSwitcher
-            table={<ProductTable rows={products} heroByProductId={heroByProductId} />}
+            table={
+              <ProductsTable
+                rows={products}
+                heroes={Object.fromEntries(heroByProductId)}
+              />
+            }
             gallery={<ProductGallery rows={products} heroByProductId={heroByProductId} />}
           />
         )}
@@ -169,172 +171,6 @@ function Tabs({
       </div>
     </div>
   );
-}
-
-function ProductTable({
-  rows,
-  heroByProductId,
-}: {
-  rows: ProductRow[];
-  heroByProductId: Map<string, { url: string; alt: string | null }>;
-}) {
-  return (
-    <div className="overflow-hidden border border-rule">
-      <table className="w-full">
-        <thead className="bg-ink text-paper">
-          <tr>
-            <Th>Image</Th>
-            <Th>SKU</Th>
-            <Th>Name</Th>
-            <Th>Brand</Th>
-            <Th>Condition</Th>
-            <Th className="text-right">Price</Th>
-            <Th>Stock</Th>
-            <Th>Status</Th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => {
-            const hero = heroByProductId.get(row.id) ?? null;
-            return (
-            <tr
-              key={row.id}
-              className="border-t border-rule transition hover:bg-rule/30"
-            >
-              <Td>
-                <ProductThumbnail hero={hero} productName={row.name} />
-              </Td>
-              <Td>
-                <Link
-                  href={`/admin/products/${row.id}`}
-                  className="font-mono text-xs text-ink hover:text-brand-red"
-                >
-                  {row.sku}
-                </Link>
-              </Td>
-              <Td>
-                <Link
-                  href={`/admin/products/${row.id}`}
-                  className="font-bold text-ink hover:text-brand-red"
-                >
-                  {row.name}
-                </Link>
-              </Td>
-              <Td className="text-ink/70">{row.brand ?? "—"}</Td>
-              <Td>
-                <ConditionLabel
-                  condition={row.condition}
-                  grade={row.condition_grade}
-                />
-              </Td>
-              <Td className="text-right font-bold tabular-nums">
-                {formatPence(row.price_pence)}
-              </Td>
-              <Td className="tabular-nums">{row.stock_quantity}</Td>
-              <Td>
-                <StatusLabel status={row.status} />
-              </Td>
-            </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function Th({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <th
-      className={`px-4 py-3 text-left text-xs font-bold uppercase tracking-widest ${className}`}
-    >
-      {children}
-    </th>
-  );
-}
-
-function Td({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return <td className={`px-4 py-3 align-middle ${className}`}>{children}</td>;
-}
-
-/**
- * Insert a Cloudinary URL transform so the admin list only downloads a
- * 96x96 thumbnail (2x for retina) instead of the full hero. Falls
- * through to the original URL untransformed if the pattern doesn't
- * match — defensive, should always match for our own uploads.
- */
-function toThumbUrl(url: string): string {
-  return url.replace(
-    "/upload/",
-    "/upload/c_fill,w_128,h_128,q_auto,f_auto/"
-  );
-}
-
-/**
- * Renders the product's hero image as a 48x48 admin-list thumbnail.
- * Falls back to a placeholder rectangle when a product has no hero
- * (drafts, freshly created, or anything in the legacy state before
- * heroes were assigned).
- */
-function ProductThumbnail({
-  hero,
-  productName,
-}: {
-  hero: { url: string; alt: string | null } | null;
-  productName: string;
-}) {
-  if (!hero) {
-    return (
-      <div className="h-16 w-16 border border-rule bg-rule/40" aria-hidden />
-    );
-  }
-  return (
-    /* eslint-disable-next-line @next/next/no-img-element */
-    <img
-      src={toThumbUrl(hero.url)}
-      alt={hero.alt ?? productName}
-      width={64}
-      height={64}
-      className="h-16 w-16 border border-rule object-cover"
-      loading="lazy"
-    />
-  );
-}
-
-function ConditionLabel({
-  condition,
-  grade,
-}: {
-  condition: ProductRow["condition"];
-  grade: ProductRow["condition_grade"];
-}) {
-  if (condition === "new") {
-    return <span className="text-ink/80">New</span>;
-  }
-  return (
-    <span className="text-ink/80">
-      Used <span className="text-ink/40">·</span>{" "}
-      <span className="font-mono text-ink/60">Grade {grade ?? "?"}</span>
-    </span>
-  );
-}
-
-function StatusLabel({ status }: { status: ProductRow["status"] }) {
-  const label =
-    status === "live" ? "Live" : status === "draft" ? "Draft" : "Archived";
-  return <StatusPill tone={status}>{label}</StatusPill>;
 }
 
 function EmptyState() {
