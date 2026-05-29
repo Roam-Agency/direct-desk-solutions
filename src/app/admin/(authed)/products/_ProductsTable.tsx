@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { formatPence } from "@/lib/products/format";
 import type { Database } from "@/types/database";
 import { StatusPill } from "../_ui/StatusPill";
-import { archiveProducts, deleteProducts } from "./_actions";
+import { archiveProducts, deleteProducts, publishProducts } from "./_actions";
 
 type ProductRow = Database["public"]["Tables"]["products"]["Row"];
 type Hero = { url: string; alt: string | null };
@@ -17,7 +17,7 @@ type Hero = { url: string; alt: string | null };
  * Client component because selection is interactive state. The header
  * checkbox selects/clears every visible (filtered) row; a per-row checkbox
  * toggles one. When at least one row is selected, a bulk-action bar appears
- * with Archive and Delete.
+ * with Set Live, Archive and Delete.
  *
  * Selection is keyed to the *visible* row set: navigating between status /
  * condition filters (or a post-action refresh) swaps the rows, and the
@@ -73,6 +73,30 @@ export function ProductsTable({
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
+    });
+  }
+
+  function handlePublish() {
+    const ids = [...selected];
+    const n = ids.length;
+    if (n === 0) return;
+    if (
+      !confirm(
+        `Set ${n} product${n === 1 ? "" : "s"} live? ${
+          n === 1 ? "It" : "They"
+        } will be visible on the customer site.`
+      )
+    ) {
+      return;
+    }
+    startTransition(async () => {
+      const result = await publishProducts(ids);
+      if (!result.ok) {
+        alert(result.formError);
+        return;
+      }
+      setSelected(new Set());
+      router.refresh();
     });
   }
 
@@ -135,6 +159,7 @@ export function ProductsTable({
       <BulkActionBar
         count={selectedCount}
         disabled={isPending}
+        onPublish={handlePublish}
         onArchive={handleArchive}
         onDelete={handleDelete}
         onClear={() => setSelected(new Set())}
@@ -231,12 +256,14 @@ export function ProductsTable({
 function BulkActionBar({
   count,
   disabled,
+  onPublish,
   onArchive,
   onDelete,
   onClear,
 }: {
   count: number;
   disabled: boolean;
+  onPublish: () => void;
   onArchive: () => void;
   onDelete: () => void;
   onClear: () => void;
@@ -248,6 +275,14 @@ function BulkActionBar({
         {count} selected
       </span>
       <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onPublish}
+          disabled={disabled}
+          className="border border-paper bg-paper px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-ink transition hover:bg-paper/80 disabled:opacity-50"
+        >
+          Set Live
+        </button>
         <button
           type="button"
           onClick={onArchive}
