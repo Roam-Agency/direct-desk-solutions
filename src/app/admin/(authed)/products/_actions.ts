@@ -241,9 +241,60 @@ type BulkArchiveResult =
   | { ok: true; archivedCount: number }
   | { ok: false; formError: string };
 
+type BulkPublishResult =
+  | { ok: true; publishedCount: number }
+  | { ok: false; formError: string };
+
 type BulkDeleteResult =
   | { ok: true; deletedCount: number; skippedCount: number }
   | { ok: false; formError: string };
+
+/**
+ * Set a set of products live (draft/archived → live) in one action.
+ *
+ * Mirrors the archiveProducts contract for the inverse direction. Two
+ * updates rather than one because going live also needs to stamp a
+ * publish timestamp:
+ *
+ *   1. Flip status to "live" for every selected id.
+ *   2. Stamp published_at = now() only on rows that have never been
+ *      published (published_at IS NULL). Re-publishing an archived item
+ *      keeps its original publish date — same first-publish rule the
+ *      condition-report publish uses (`?? now()`).
+ *
+ * published_at drives the customer-facing "newest first" ordering, so a
+ * freshly-published product needs a timestamp to sort correctly rather
+ * than falling back to created_at.
+ */
+export async function publishProducts(
+  ids: string[]
+): Promise<BulkPublishResult> {
+  if (ids.length === 0) {
+    return { ok: false, formError: "No products selected" };
+  }
+
+  const supabase = await createClient();
+
+  const { error: statusError } = await supabase
+    .from("products")
+    .update({ status: "live" })
+    .in("id", ids);
+
+  if (statusError) return { ok: false, formError: statusError.message };
+
+  // Stamp a publish timestamp on first-time publishes only.
+  const { error: stampError } = await supabase
+    .from("products")
+    .update({ published_at: new Date().toISOString() })
+    .in("id", ids)
+    .is("published_at", null);
+
+  if (stampError) return { ok: false, formError: stampError.message };
+
+  revalidatePath("/admin/products");
+  for (const id of ids) revalidatePath(`/admin/products/${id}`);
+  return { ok: true, publishedCount: ids.length };
+}
 
 export async function archiveProducts(
   ids: string[]
