@@ -58,7 +58,11 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     .select("*")
     .order("updated_at", { ascending: false });
 
-  if (status !== "all") query = query.eq("status", status);
+  // "All" means the working catalogue (live + draft). Archived products
+  // are hidden here and surfaced only under the Archived tab, so day-to-day
+  // the list isn't cluttered with items pulled from sale.
+  if (status === "all") query = query.neq("status", "archived");
+  else query = query.eq("status", status);
   if (condition !== "all") query = query.eq("condition", condition);
 
   const { data: products, error } = await query;
