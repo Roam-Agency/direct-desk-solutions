@@ -81,7 +81,8 @@ export type CheckoutSessionResult = ActionResult<{ url: string }>;
 // ---------------------------------------------------------------------------
 
 export async function createCheckoutSession(
-  cartItems: CheckoutCartInput[]
+  cartItems: CheckoutCartInput[],
+  marketingConsent: boolean = false
 ): Promise<CheckoutSessionResult> {
   // ---- 1. Defensive input validation -------------------------------------
   if (!Array.isArray(cartItems) || cartItems.length === 0) {
@@ -279,9 +280,9 @@ export async function createCheckoutSession(
 
       // NOTE: consent_collection.promotions is a US-merchant-only feature
       // per the Stripe SDK (`Only available to US merchants`). DDS is a
-      // UK merchant, so enabling it caused sessions.create to throw and
-      // the buyer hit "Could not start checkout". Marketing opt-in for
-      // UK will be handled via a separate post-purchase flow if needed.
+      // UK merchant, so it is NOT used. Marketing opt-in is instead
+      // captured by our own checkbox on /cart and threaded through the
+      // session metadata below (marketing_consent).
 
       // Billing address is asked for by Stripe by default; this just
       // makes it explicit. Buyer-typed address is more reliable than
@@ -303,6 +304,12 @@ export async function createCheckoutSession(
       metadata: {
         reservation_group_id: randomUUID(),
         site: "direct-desk-solutions",
+        // Marketing opt-in captured by our own checkbox on /cart.
+        // Stripe metadata values are strings; the webhook reads this
+        // back and parses it. We use our own metadata rather than
+        // Stripe's consent_collection because that feature is
+        // US-merchant-only and rejects GB accounts (see comment above).
+        marketing_consent: marketingConsent ? "true" : "false",
       },
     });
   } catch (err) {

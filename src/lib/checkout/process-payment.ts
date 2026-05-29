@@ -197,11 +197,13 @@ export async function processCheckoutCompleted(
 
   const totalPence = session.amount_total ?? 0;
 
-  // Marketing consent. Stripe's hosted Checkout returns consent values
-  // on session.consent (when consent_collection is enabled). Defensive
-  // about shape - fall back to false if anything is missing.
-  const promoConsent =
-    session.consent?.promotions === "opt_in" ? true : false;
+  // Marketing consent. Captured by our own checkbox on /cart and passed
+  // through the Checkout session metadata (Stripe's native
+  // consent_collection is US-merchant-only and unusable on our GB
+  // account). Metadata values are strings; anything other than the
+  // literal "true" is treated as no-consent. Defensive: missing
+  // metadata falls through to false.
+  const promoConsent = session.metadata?.marketing_consent === "true";
   const nowIso = new Date().toISOString();
 
   // Read any existing customer row to preserve first_order_at and
