@@ -49,6 +49,178 @@ import type { OrderConfirmationPayload } from "@/lib/email/order-confirmation";
  * no items), but the unique constraint prevents duplicates and the
  * admin order detail page will surface the inconsistency.
  */
+/**
+ * Stripe charge.refunded handler.
+ *
+ * Maps the refunded charge back to our order via stripe_payment_intent,
+ * mirrors Stripe's cumulative amount_refunded into orders.refunded_pence,
+ * flips status to 'refunded' on a full refund, and (only on the
+ * paid->refunded transition for a full refund) restocks the ordered items.
+ *
+ * --- Idempotency ---
+ * Stripe retries webhooks and may deliver duplicates. Two protections:
+ *   1. We read the order's current refunded_pence first and only proceed
+ *      if the incoming amount_refunded is STRICTLY GREATER. A duplicate
+ *      or stale delivery (same or lower amount) is a no-op skip.
+ *   2. refunded_pence is SET to the cumulative figure, never incremented,
+ *      so even if (1) were bypassed the financial field would not drift.
+ * Restock is the one non-idempotent action; it is gated behind BOTH the
+ * amount-increased check AND a status guard (only when the order is not
+ * already 'refunded'), so a retried full-refund cannot double-restock.
+ *
+ * --- Partial refunds ---
+ * There is no 'partially_refunded' status in the order_status enum, so a
+ * partial refund records refunded_pence but leaves status as-is and does
+ * NOT restock (you cannot return half a desk to the shelf).
+ */
+export async function processRefund(
+  event: Stripe.Event
+): Promise<
+  | { orderId: string; refundedPence: number; fullRefund: boolean; restocked: boolean }
+  | { skipped: string }
+> {
+  if (event.type !== "charge.refunded") {
+    return { skipped: `event type ${event.type} not handled` };
+  }
+
+  const charge = event.data.object as Stripe.Charge;
+
+  // Map charge -> order via the payment intent. The charge's
+  // payment_intent can be a string id or an expanded object (or null).
+  const paymentIntentId =
+    typeof charge.payment_intent === "string"
+      ? charge.payment_intent
+      : charge.payment_intent?.id ?? null;
+
+  if (!paymentIntentId) {
+    return { skipped: `charge ${charge.id} has no payment_intent` };
+  }
+
+  const admin = createAdminClient();
+
+  // ---------- 1. Find the order ----------
+  const { data: order, error: orderErr } = await admin
+    .from("orders")
+    .select("id, status, total_pence, refunded_pence")
+    .eq("stripe_payment_intent", paymentIntentId)
+    .maybeSingle();
+
+  if (orderErr) {
+    throw new Error(
+      `Order lookup failed for payment_intent ${paymentIntentId}: ${orderErr.message}`
+    );
+  }
+  if (!order) {
+    // A refund for a charge we never recorded an order for. Nothing to
+    // do; 200-skip so Stripe stops retrying.
+    return {
+      skipped: `no order for payment_intent ${paymentIntentId}`,
+    };
+  }
+
+  // ---------- 2. Idempotency gate ----------
+  // Stripe gives the CUMULATIVE amount refunded on the charge. Only act
+  // if it has increased beyond what we already recorded.
+  const incoming = charge.amount_refunded;
+  if (incoming <= order.refunded_pence) {
+    return {
+      skipped:
+        `refund for order ${order.id} not increased ` +
+        `(incoming ${incoming} <= stored ${order.refunded_pence})`,
+    };
+  }
+
+  const isFullRefund = incoming >= order.total_pence;
+  // Restock only on the transition INTO a full refund. If status is
+  // already 'refunded' a prior delivery handled the restock.
+  const shouldRestock = isFullRefund && order.status !== "refunded";
+
+  // ---------- 3. Update the order financials + status ----------
+  const { error: updErr } = await admin
+    .from("orders")
+    .update({
+      refunded_pence: incoming,
+      status: isFullRefund ? "refunded" : order.status,
+    })
+    .eq("id", order.id);
+
+  if (updErr) {
+    throw new Error(
+      `Refund update failed for order ${order.id}: ${updErr.message}`
+    );
+  }
+
+  // ---------- 4. Restock (full refund, first transition only) ----------
+  if (!shouldRestock) {
+    return {
+      orderId: order.id,
+      refundedPence: incoming,
+      fullRefund: isFullRefund,
+      restocked: false,
+    };
+  }
+
+  // order_items is the permanent record of what was bought (reservations
+  // get marked confirmed/cancelled and may expire). Read product_id +
+  // quantity and add each back to products.stock_quantity, mirroring the
+  // paid-path decrement in reverse.
+  const { data: items, error: itemsErr } = await admin
+    .from("order_items")
+    .select("product_id, quantity")
+    .eq("order_id", order.id);
+
+  if (itemsErr) {
+    throw new Error(
+      `order_items lookup failed for order ${order.id}: ${itemsErr.message}`
+    );
+  }
+
+  for (const it of items ?? []) {
+    // order_items.product_id is nullable (a line can outlive a deleted
+    // product). Skip a line we cannot identify - nothing to restock - and
+    // this also narrows product_id to string for the queries below.
+    if (!it.product_id) continue;
+
+    // Re-read current stock per product, then set it + the refunded qty.
+    const { data: product, error: prodErr } = await admin
+      .from("products")
+      .select("stock_quantity")
+      .eq("id", it.product_id)
+      .maybeSingle();
+
+    if (prodErr) {
+      throw new Error(
+        `Product lookup failed for ${it.product_id} on refund of ` +
+          `order ${order.id}: ${prodErr.message}`
+      );
+    }
+    if (!product) {
+      // Product was deleted since purchase. Nothing to restock; skip the
+      // line rather than fail the whole refund.
+      continue;
+    }
+
+    const { error: restockErr } = await admin
+      .from("products")
+      .update({ stock_quantity: product.stock_quantity + it.quantity })
+      .eq("id", it.product_id);
+
+    if (restockErr) {
+      throw new Error(
+        `Restock failed for product ${it.product_id} on refund of ` +
+          `order ${order.id}: ${restockErr.message}`
+      );
+    }
+  }
+
+  return {
+    orderId: order.id,
+    refundedPence: incoming,
+    fullRefund: isFullRefund,
+    restocked: true,
+  };
+}
+
 export async function processCheckoutCompleted(
   event: Stripe.Event
 ): Promise<
