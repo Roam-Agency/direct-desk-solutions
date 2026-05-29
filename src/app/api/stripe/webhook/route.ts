@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 
 import { getStripe, getWebhookSecret } from "@/lib/stripe/server";
-import { processCheckoutCompleted } from "@/lib/checkout/process-payment";
+import {
+  processCheckoutCompleted,
+  processRefund,
+} from "@/lib/checkout/process-payment";
 import { sendOrderConfirmation } from "@/lib/email/order-confirmation";
 
 /**
@@ -69,8 +72,39 @@ export async function POST(req: Request): Promise<NextResponse> {
     );
   }
 
-  // Currently we only handle checkout.session.completed. Other events
-  // get 200 + skipped=true so Stripe stops retrying.
+  // Refund handling. charge.refunded fires for full AND partial refunds;
+  // processRefund is idempotent and decides what to update.
+  if (event.type === "charge.refunded") {
+    try {
+      const result = await processRefund(event);
+      if ("skipped" in result) {
+        return NextResponse.json({
+          received: true,
+          skipped: true,
+          reason: result.skipped,
+        });
+      }
+      return NextResponse.json({
+        received: true,
+        orderId: result.orderId,
+        refundedPence: result.refundedPence,
+        fullRefund: result.fullRefund,
+        restocked: result.restocked,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("webhook: processRefund failed", {
+        eventId: event.id,
+        msg,
+      });
+      return NextResponse.json(
+        { error: "Webhook processing failed" },
+        { status: 500 }
+      );
+    }
+  }
+
+  // Any other event type: 200 + skipped=true so Stripe stops retrying.
   if (event.type !== "checkout.session.completed") {
     return NextResponse.json({
       received: true,
