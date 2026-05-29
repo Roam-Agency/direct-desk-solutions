@@ -1,5 +1,7 @@
 import Link from "next/link";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
+import logoLight from "@/assets/brand/dds-logo-light.png";
 import { MobileDrawerShell, NavItem } from "./_AdminSidebar.client";
 
 /**
@@ -39,17 +41,12 @@ export async function AdminSidebar({ userEmail }: { userEmail: string }) {
   return (
     <MobileDrawerShell>
       <div className="flex h-full min-h-screen flex-col">
-        {/* Wordmark */}
+        {/* Brand logo (white-on-dark variant for the dark rail) */}
         <div className="border-b border-paper/10 px-5 py-6">
-          <Link href="/admin" className="flex items-baseline gap-0">
-            <span className="text-lg font-black tracking-tight text-paper">
-              Direct Desk
-            </span>
-            <span className="text-lg font-black tracking-tight text-brand-red">
-              .
-            </span>
+          <Link href="/admin" aria-label="Direct Desk Solutions admin" className="block">
+            <Image src={logoLight} alt="Direct Desk Solutions" className="h-8 w-auto" />
           </Link>
-          <span className="mt-1 block text-[10px] font-bold uppercase tracking-widest text-paper/40">
+          <span className="mt-2 block text-[10px] font-bold uppercase tracking-widest text-paper/40">
             Admin
           </span>
         </div>
