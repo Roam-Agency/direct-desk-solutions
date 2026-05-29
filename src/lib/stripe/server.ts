@@ -26,7 +26,7 @@ import Stripe from "stripe";
  *
  * --- Env vars used (set in .env.local + Netlify) ---
  *   STRIPE_SECRET_KEY              server-only, never reaches browser
- *   STRIPE_WEBHOOK_SECRET          used by /api/stripe/webhook to verify
+ *   DDS_STRIPE_WEBHOOK_SECRET      used by /api/stripe/webhook to verify
  *                                  signed payloads. Set after webhook
  *                                  endpoint is created in Stripe dashboard.
  *   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
@@ -80,9 +80,9 @@ export function getStripePublishableKey(): string {
  * signed payloads. Throws if missing at call time.
  */
 export function getWebhookSecret(): string {
-  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  const secret = process.env.DDS_STRIPE_WEBHOOK_SECRET;
   if (!secret) {
-    throw new Error("STRIPE_WEBHOOK_SECRET is not set in environment");
+    throw new Error("DDS_STRIPE_WEBHOOK_SECRET is not set in environment");
   }
   return secret;
 }

@@ -9,7 +9,7 @@ import { sendOrderConfirmation } from "@/lib/email/order-confirmation";
  * Stripe webhook endpoint - POST /api/stripe/webhook.
  *
  * Stripe dashboard sends events to this URL with a stripe-signature
- * header that we verify against STRIPE_WEBHOOK_SECRET. Verified
+ * header that we verify against DDS_STRIPE_WEBHOOK_SECRET. Verified
  * checkout.session.completed events are dispatched to
  * processCheckoutCompleted (in src/lib/checkout/process-payment.ts).
  *
