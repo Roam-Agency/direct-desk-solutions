@@ -653,3 +653,164 @@ export async function listLiveProductsByBrandSlug(opts: {
   const productCards = await attachHeroImagesToProducts(products ?? []);
   return { brand, products: productCards };
 }
+
+/**
+ * The category-tile projection returned by
+ * listFunctionalCategoriesWithCounts. Mirrors BrandWithCount but for
+ * kind='functional' categories — the primary "what kind of furniture
+ * is it" browse axis.
+ */
+export type CategoryWithCount = CategoryRow & {
+  live_product_count: number;
+};
+
+/**
+ * List all active functional categories, sorted by sort_order then
+ * name, with a count of live products attached to each. Mirrors
+ * listBrandsWithCounts — zero-count categories are kept (rendered as
+ * "Coming soon" on the /categories index) so they stay discoverable.
+ */
+export async function listFunctionalCategoriesWithCounts(): Promise<
+  CategoryWithCount[]
+> {
+  const supabase = await createClient();
+
+  const { data: categories, error: categoriesError } = await supabase
+    .from("categories")
+    .select("*")
+    .eq("kind", "functional")
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+
+  if (categoriesError) {
+    console.error("listFunctionalCategoriesWithCounts error (categories)", {
+      categoriesError,
+    });
+    return [];
+  }
+
+  if (!categories || categories.length === 0) return [];
+
+  const categoryIds = categories.map((c) => c.id);
+  const { data: joins, error: joinsError } = await supabase
+    .from("product_categories")
+    .select("category_id, product:products!inner(status)")
+    .in("category_id", categoryIds)
+    .eq("product.status", "live");
+
+  if (joinsError) {
+    console.error("listFunctionalCategoriesWithCounts error (joins)", {
+      joinsError,
+    });
+    return categories.map((c) => ({ ...c, live_product_count: 0 }));
+  }
+
+  const countByCategoryId = new Map<string, number>();
+  for (const row of joins ?? []) {
+    countByCategoryId.set(
+      row.category_id,
+      (countByCategoryId.get(row.category_id) ?? 0) + 1
+    );
+  }
+
+  return categories.map((c) => ({
+    ...c,
+    live_product_count: countByCategoryId.get(c.id) ?? 0,
+  }));
+}
+
+/**
+ * The result of looking up a functional category by slug + its live
+ * products. Mirrors BrandWithProducts. Returns null if no active
+ * functional category with that slug exists.
+ */
+export type CategoryWithProducts = {
+  category: CategoryRow;
+  products: ProductCard[];
+};
+
+/**
+ * Look up a functional category by slug and return it alongside its
+ * live products as ProductCards. Mirrors listLiveProductsByBrandSlug.
+ *
+ * Returns null if no category matches the slug, it isn't
+ * kind='functional', or it isn't is_active=true. An existing category
+ * with zero live products returns { category, products: [] } so the
+ * page can render the header with an empty-state message underneath.
+ */
+export async function listLiveProductsByCategorySlug(opts: {
+  categorySlug: string;
+  sortBy?: ListingSort;
+  condition?: "new" | "used";
+}): Promise<CategoryWithProducts | null> {
+  const supabase = await createClient();
+  const sortBy = opts.sortBy ?? _DEFAULT_SORT;
+
+  // Resolve the functional category first. Not found / inactive / wrong
+  // kind all return null so the caller can 404.
+  const { data: category, error: categoryError } = await supabase
+    .from("categories")
+    .select("*")
+    .eq("slug", opts.categorySlug)
+    .eq("kind", "functional")
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (categoryError) {
+    console.error("listLiveProductsByCategorySlug error (category)", {
+      opts,
+      categoryError,
+    });
+    return null;
+  }
+
+  if (!category) return null;
+
+  const { data: joins, error: joinsError } = await supabase
+    .from("product_categories")
+    .select("product_id")
+    .eq("category_id", category.id);
+
+  if (joinsError) {
+    console.error("listLiveProductsByCategorySlug error (joins)", {
+      opts,
+      joinsError,
+    });
+    return { category, products: [] };
+  }
+
+  const productIds = (joins ?? []).map((j) => j.product_id);
+  if (productIds.length === 0) return { category, products: [] };
+
+  const query = supabase
+    .from("products")
+    .select("*")
+    .in("id", productIds)
+    .eq("status", "live");
+
+  if (opts.condition) {
+    query.eq("condition", opts.condition);
+  }
+
+  if (sortBy === "price-asc") {
+    query.order("price_pence", { ascending: true });
+  } else if (sortBy === "price-desc") {
+    query.order("price_pence", { ascending: false });
+  } else {
+    query.order("published_at", { ascending: false, nullsFirst: false });
+  }
+
+  const { data: products, error: productsError } = await query;
+
+  if (productsError) {
+    console.error("listLiveProductsByCategorySlug error (products)", {
+      opts,
+      productsError,
+    });
+    return { category, products: [] };
+  }
+
+  const productCards = await attachHeroImagesToProducts(products ?? []);
+  return { category, products: productCards };
+}

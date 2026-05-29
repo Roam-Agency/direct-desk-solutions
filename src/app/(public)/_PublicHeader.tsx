@@ -10,6 +10,7 @@ const NAV_LINKS = [
   { href: "/products/new", label: "Shop New" },
   { href: "/products/used", label: "Shop Used" },
   { href: "/brands", label: "Brands" },
+  { href: "/categories", label: "Categories" },
 ];
 
 // Reusable magnifying-glass icon. 24px square; stroke inherits via
