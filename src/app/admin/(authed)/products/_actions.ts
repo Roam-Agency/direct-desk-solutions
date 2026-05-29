@@ -228,6 +228,82 @@ export async function deleteProduct(id: string): Promise<void> {
   redirect("/admin/products");
 }
 
+// ----------------------------------------------------------------------------
+// Bulk actions (multi-select on the products list)
+// ----------------------------------------------------------------------------
+// Mirror the single-row archive/delete contract for a set of ids. Same
+// safety rule as the per-product edit page (`canHardDelete`): only draft,
+// never-published products may be hard-deleted. Live/archived or
+// previously-published rows are skipped rather than destroyed, and the
+// caller is told how many were skipped so it can surface that to the admin.
+
+type BulkArchiveResult =
+  | { ok: true; archivedCount: number }
+  | { ok: false; formError: string };
+
+type BulkDeleteResult =
+  | { ok: true; deletedCount: number; skippedCount: number }
+  | { ok: false; formError: string };
+
+export async function archiveProducts(
+  ids: string[]
+): Promise<BulkArchiveResult> {
+  if (ids.length === 0) {
+    return { ok: false, formError: "No products selected" };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("products")
+    .update({ status: "archived" })
+    .in("id", ids);
+
+  if (error) return { ok: false, formError: error.message };
+
+  revalidatePath("/admin/products");
+  for (const id of ids) revalidatePath(`/admin/products/${id}`);
+  return { ok: true, archivedCount: ids.length };
+}
+
+export async function deleteProducts(
+  ids: string[]
+): Promise<BulkDeleteResult> {
+  if (ids.length === 0) {
+    return { ok: false, formError: "No products selected" };
+  }
+
+  const supabase = await createClient();
+
+  // Only draft, never-published products are safe to hard-delete — same
+  // rule the edit page enforces via `canHardDelete`. Everything else is
+  // skipped so a bulk action can't wipe live catalogue or order history.
+  const { data: rows, error: fetchError } = await supabase
+    .from("products")
+    .select("id, status, published_at")
+    .in("id", ids);
+
+  if (fetchError) return { ok: false, formError: fetchError.message };
+
+  const deletable = (rows ?? [])
+    .filter((r) => r.status === "draft" && !r.published_at)
+    .map((r) => r.id);
+  const skippedCount = ids.length - deletable.length;
+
+  if (deletable.length === 0) {
+    return { ok: true, deletedCount: 0, skippedCount };
+  }
+
+  const { error: deleteError } = await supabase
+    .from("products")
+    .delete()
+    .in("id", deletable);
+
+  if (deleteError) return { ok: false, formError: deleteError.message };
+
+  revalidatePath("/admin/products");
+  return { ok: true, deletedCount: deletable.length, skippedCount };
+}
+
 
 // ----------------------------------------------------------------------------
 // Image upload pipeline
