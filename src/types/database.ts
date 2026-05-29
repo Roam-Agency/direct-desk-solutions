@@ -43,6 +43,7 @@ export type Database = {
           contact_email: string
           default_warranty_terms: string
           free_delivery_message: string
+          free_shipping_active: boolean
           id: number
           low_stock_threshold: number
           updated_at: string
@@ -52,6 +53,7 @@ export type Database = {
           contact_email?: string
           default_warranty_terms?: string
           free_delivery_message?: string
+          free_shipping_active?: boolean
           id?: number
           low_stock_threshold?: number
           updated_at?: string
@@ -61,6 +63,7 @@ export type Database = {
           contact_email?: string
           default_warranty_terms?: string
           free_delivery_message?: string
+          free_shipping_active?: boolean
           id?: number
           low_stock_threshold?: number
           updated_at?: string

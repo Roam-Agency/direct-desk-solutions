@@ -38,8 +38,16 @@ export const STOCK_RESERVATION_TTL_MINUTES = 15;
  *   subtotal £499  → £29 shipping
  *   subtotal £500  → free
  *   subtotal £650  → free
+ *
+ * The site-wide free-shipping switch (managed in /admin/settings, used for
+ * flash sales) short-circuits everything: when active, all orders ship free
+ * regardless of subtotal.
  */
-export function computeShippingPence(subtotalPence: number): number {
+export function computeShippingPence(
+  subtotalPence: number,
+  { freeShippingActive = false }: { freeShippingActive?: boolean } = {}
+): number {
+  if (freeShippingActive) return 0;
   if (subtotalPence >= FREE_SHIPPING_THRESHOLD_PENCE) return 0;
   return FLAT_SHIPPING_RATE_PENCE;
 }

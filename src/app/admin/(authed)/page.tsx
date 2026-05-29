@@ -6,6 +6,7 @@ import { StatCard } from "./_ui/StatCard";
 import { StatusPill } from "./_ui/StatusPill";
 import { DashboardDropZone } from "./_DashboardDropZone";
 import { getFinancialOverview } from "./_financial";
+import { getAppSettings } from "@/lib/settings/fetch";
 
 /**
  * Admin dashboard — daily-driver landing page.
@@ -60,7 +61,7 @@ export default async function AdminDashboard() {
   // Parallel queries: stats set, recent products, recent orders.
   // Heroes for the recent products column come in a second round-trip
   // (depends on the recent-products result).
-  const [productsForStatsRes, recentProductsRes, recentOrdersRes] =
+  const [productsForStatsRes, recentProductsRes, recentOrdersRes, settings] =
     await Promise.all([
       supabase
         .from("products")
@@ -77,14 +78,17 @@ export default async function AdminDashboard() {
         )
         .order("created_at", { ascending: false })
         .limit(5),
+      getAppSettings(),
     ]);
 
   const productsForStats = productsForStatsRes.data ?? [];
   const recentProducts = recentProductsRes.data ?? [];
   const recentOrdersRaw = recentOrdersRes.data ?? [];
 
-  // Derive stats in a single pass. Low-stock semantics: only count
-  // products that have a threshold set (low_stock_alert IS NOT NULL).
+  // Derive stats in a single pass. Low-stock semantics: a product counts when
+  // its stock is at or below its threshold. The per-product low_stock_alert
+  // wins when set; otherwise we fall back to the site-wide low_stock_threshold
+  // configured in /admin/settings.
   let liveCount = 0;
   let draftCount = 0;
   let usedInStockCount = 0;
@@ -93,10 +97,8 @@ export default async function AdminDashboard() {
     if (p.status === "live") liveCount++;
     if (p.status === "draft") draftCount++;
     if (p.condition === "used" && p.stock_quantity > 0) usedInStockCount++;
-    if (
-      p.low_stock_alert !== null &&
-      p.stock_quantity <= p.low_stock_alert
-    ) {
+    const threshold = p.low_stock_alert ?? settings.low_stock_threshold;
+    if (p.stock_quantity <= threshold) {
       lowStockCount++;
     }
   }

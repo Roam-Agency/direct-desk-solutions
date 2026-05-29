@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { getStripe } from "@/lib/stripe/server";
 import { formatPence } from "@/lib/products/format";
+import { getAppSettings } from "@/lib/settings/fetch";
 import Breadcrumb from "../../_Breadcrumb";
 import ClearCartOnMount from "./_ClearCartOnMount";
 
@@ -48,10 +49,11 @@ export default async function CheckoutSuccessPage({
 }: SuccessPageProps) {
   const params = await searchParams;
   const sessionId = params.session_id;
+  const { contact_email: contactEmail } = await getAppSettings();
 
   // No session_id at all - buyer arrived here by mistake.
   if (!sessionId) {
-    return <UnconfirmedView reason="missing" />;
+    return <UnconfirmedView reason="missing" contactEmail={contactEmail} />;
   }
 
   // Retrieve from Stripe. expand line_items so we can render a summary
@@ -66,13 +68,15 @@ export default async function CheckoutSuccessPage({
       sessionId,
       error,
     });
-    return <UnconfirmedView reason="retrieve-failed" />;
+    return (
+      <UnconfirmedView reason="retrieve-failed" contactEmail={contactEmail} />
+    );
   }
 
   // Stripe returns sessions in many states. We only render success for
   // a session that has actually been paid.
   if (session.payment_status !== "paid") {
-    return <UnconfirmedView reason="not-paid" />;
+    return <UnconfirmedView reason="not-paid" contactEmail={contactEmail} />;
   }
 
   const lineItems = session.line_items?.data ?? [];
@@ -147,7 +151,7 @@ export default async function CheckoutSuccessPage({
             Continue browsing
           </Link>
           <a
-            href="mailto:info@directdesksolutions.com?subject=Order%20query"
+            href={`mailto:${contactEmail}?subject=Order%20query`}
             className="inline-block border border-ink/20 text-ink text-[11px] uppercase tracking-[0.22em] font-bold py-4 px-8 hover:bg-ink hover:text-paper transition-colors text-center"
           >
             Email support
@@ -167,8 +171,10 @@ export default async function CheckoutSuccessPage({
  */
 function UnconfirmedView({
   reason,
+  contactEmail,
 }: {
   reason: "missing" | "retrieve-failed" | "not-paid";
+  contactEmail: string;
 }) {
   return (
     <div className="mx-auto max-w-7xl px-6 pt-6 pb-24">
@@ -187,7 +193,7 @@ function UnconfirmedView({
             : "We couldn’t look up the order details. If you completed payment, please email us and we’ll sort it out."}
         </p>
         <a
-          href="mailto:info@directdesksolutions.com?subject=Order%20status%20query"
+          href={`mailto:${contactEmail}?subject=Order%20status%20query`}
           className="inline-block bg-brand-red text-paper text-[11px] uppercase tracking-[0.22em] font-bold py-4 px-8 hover:bg-ink transition-colors"
         >
           Email us

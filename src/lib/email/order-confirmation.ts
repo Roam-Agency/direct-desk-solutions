@@ -25,7 +25,10 @@ import { getResend } from "@/lib/email/client";
 // CONFIG CONSTANTS — swap real values here.
 // ─────────────────────────────────────────────────────────────
 const FROM_ADDRESS = "Direct Desk Solutions <orders@directdesksolutions.com>";
-const REPLY_TO = "info@directdesksolutions.com";
+// Fallback reply-to. The caller passes the admin-configured contact email
+// (app_settings.contact_email) on the payload; this is used only when that
+// is absent.
+const DEFAULT_REPLY_TO = "info@directdesksolutions.com";
 // Email clients need an absolute URL for the logo. We serve it from this
 // app's own /public folder (public/email-logo.png) so there's no external
 // dependency — it follows NEXT_PUBLIC_SITE_URL the same way metadataBase
@@ -70,6 +73,9 @@ export type OrderConfirmationPayload = {
   shippingPence: number;
   totalPence: number;
   shippingAddress: OrderConfirmationAddress;
+  /** Admin-configured contact email used as the reply-to. Optional —
+   *  falls back to DEFAULT_REPLY_TO when not supplied. */
+  replyTo?: string | null;
 };
 
 export type SendResult =
@@ -335,7 +341,7 @@ export async function sendOrderConfirmation(
     const { data, error } = await getResend().emails.send({
       from: FROM_ADDRESS,
       to: payload.to,
-      replyTo: REPLY_TO,
+      replyTo: payload.replyTo?.trim() || DEFAULT_REPLY_TO,
       subject,
       html: buildHtml(payload),
       text: buildText(payload),

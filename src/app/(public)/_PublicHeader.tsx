@@ -33,7 +33,11 @@ function SearchIcon() {
   );
 }
 
-export default function PublicHeader() {
+export default function PublicHeader({
+  contactEmail,
+}: {
+  contactEmail: string;
+}) {
   const [open, setOpen] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -170,10 +174,10 @@ export default function PublicHeader() {
           </nav>
           <div className="px-6 py-8 border-t border-white/10 flex-shrink-0">
             <a
-              href="mailto:info@directdesksolutions.com"
+              href={`mailto:${contactEmail}`}
               className="text-xs uppercase tracking-[0.18em] font-bold border-b-2 border-white pb-1"
             >
-              info@directdesksolutions.com
+              {contactEmail}
             </a>
           </div>
         </div>

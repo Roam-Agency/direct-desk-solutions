@@ -67,6 +67,7 @@ export async function AdminSidebar({ userEmail }: { userEmail: string }) {
             count={ordersAttentionCount}
             showNewDot
           />
+          <NavItem href="/admin/settings" label="Settings" />
         </nav>
 
         {/* Spacer pushes the user / sign-out block to the bottom */}

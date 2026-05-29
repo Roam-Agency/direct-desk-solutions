@@ -21,10 +21,16 @@ import CartDrawer from "./_CartDrawer";
  * passes <main className="flex-1">{children}</main> through this
  * wrapper.
  */
-export default function ChromeShell({ children }: { children: ReactNode }) {
+export default function ChromeShell({
+  children,
+  contactEmail,
+}: {
+  children: ReactNode;
+  contactEmail: string;
+}) {
   return (
     <CartProvider>
-      <PublicHeader />
+      <PublicHeader contactEmail={contactEmail} />
       {children}
       <CartDrawer />
     </CartProvider>
