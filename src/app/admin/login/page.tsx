@@ -9,7 +9,7 @@ import logoDark from "@/assets/brand/dds-logo-dark.png";
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirectTo") || "/admin/test";
+  const redirectTo = searchParams.get("redirectTo") || "/admin";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
