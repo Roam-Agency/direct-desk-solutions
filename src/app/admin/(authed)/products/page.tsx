@@ -15,7 +15,7 @@ type ConditionFilter = "all" | "new" | "used";
 // seconds. A page-at-a-time keeps the query and the rendered table small.
 // The user picks from PAGE_SIZE_OPTIONS via the "Per page" control.
 const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
-const DEFAULT_PAGE_SIZE = 50;
+const DEFAULT_PAGE_SIZE = 20;
 
 interface ProductsPageProps {
   searchParams: Promise<{
