@@ -180,8 +180,9 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
         </div>
       )}
 
+      {/* Table — desktop / tablet. Hidden on phones; card list below. */}
       {!error && customers.length > 0 && (
-        <div className="overflow-x-auto border border-rule">
+        <div className="hidden overflow-x-auto border border-rule sm:block">
           <table className="min-w-full divide-y divide-rule">
             <thead className="bg-ink/5">
               <tr>
@@ -243,6 +244,51 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* Card list — mobile only. */}
+      {!error && customers.length > 0 && (
+        <ul className="divide-y divide-rule border border-rule sm:hidden">
+          {customers.map((c) => (
+            <li key={c.id}>
+              <Link
+                href={`/admin/customers/${c.id}`}
+                className="block p-3 transition hover:bg-ink/5"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <span className="min-w-0">
+                    <span className="block truncate font-bold text-ink">
+                      {c.email}
+                    </span>
+                    <span className="mt-0.5 block truncate text-sm text-ink/70">
+                      {customerName(c)}
+                    </span>
+                  </span>
+                  {c.marketing_consent && (
+                    <span
+                      title={`Opted in ${formatDate(c.marketing_consent_at)}`}
+                      className="mt-1.5 inline-block h-2 w-2 shrink-0 rounded-full bg-brand-red"
+                      aria-label="Marketing opt-in"
+                    />
+                  )}
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] text-ink/60">
+                  <span className="tabular-nums">
+                    {c.total_orders} order{c.total_orders === 1 ? "" : "s"}
+                  </span>
+                  <span className="text-ink/30">·</span>
+                  <span className="font-bold tabular-nums text-ink">
+                    {formatPence(c.total_spent_pence)}
+                  </span>
+                  <span className="text-ink/30">·</span>
+                  <span className="tabular-nums">
+                    Last {formatDate(c.last_order_at)}
+                  </span>
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );

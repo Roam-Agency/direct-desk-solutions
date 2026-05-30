@@ -262,7 +262,7 @@ export default async function CustomerDetailPage({
             No orders yet.
           </div>
         ) : (
-          <div className="mt-3 overflow-x-auto border border-rule">
+          <div className="mt-3 hidden overflow-x-auto border border-rule sm:block">
             <table className="min-w-full divide-y divide-rule">
               <thead className="bg-ink/5">
                 <tr>
@@ -306,6 +306,35 @@ export default async function CustomerDetailPage({
               </tbody>
             </table>
           </div>
+        )}
+
+        {/* Order history — mobile cards. */}
+        {orders.length > 0 && (
+          <ul className="mt-3 divide-y divide-rule border border-rule sm:hidden">
+            {orders.map((o) => (
+              <li key={o.id} className="p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="font-mono font-bold tabular-nums text-ink">
+                    #{o.id.slice(0, 8)}
+                  </span>
+                  <span className="shrink-0 font-bold tabular-nums text-ink">
+                    {formatPence(o.total_pence)}
+                  </span>
+                </div>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                  <StatusBadge status={o.status} />
+                  <span className="text-xs text-ink/50 tabular-nums">
+                    {formatDateTime(o.created_at)}
+                  </span>
+                </div>
+                {o.refunded_pence > 0 && (
+                  <p className="mt-1 text-xs text-ink/60 tabular-nums">
+                    Refunded {formatPence(o.refunded_pence)}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </div>

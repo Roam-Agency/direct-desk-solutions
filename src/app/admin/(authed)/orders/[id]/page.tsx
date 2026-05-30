@@ -249,7 +249,7 @@ export default async function OrderDetailPage({ params }: OrderPageProps) {
           </div>
         )}
         {!itemsError && items.length > 0 && (
-          <table className="min-w-full divide-y divide-rule">
+          <table className="hidden min-w-full divide-y divide-rule sm:table">
             <thead className="bg-ink/5">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-widest text-ink/60">
@@ -307,6 +307,45 @@ export default async function OrderDetailPage({ params }: OrderPageProps) {
               })}
             </tbody>
           </table>
+        )}
+
+        {/* Line items — mobile cards. */}
+        {!itemsError && items.length > 0 && (
+          <ul className="divide-y divide-rule sm:hidden">
+            {items.map((it) => {
+              const conditionLabel = lineItemConditionBadge(
+                it.product_condition,
+                it.product_grade
+              );
+              return (
+                <li key={it.id} className="px-4 py-4">
+                  <div className="font-bold text-ink">{it.product_name}</div>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink/60">
+                    {it.product_brand && <span>{it.product_brand}</span>}
+                    {it.product_brand && (
+                      <span className="text-ink/30">{"·"}</span>
+                    )}
+                    <span className="font-mono break-all">
+                      SKU {it.product_sku}
+                    </span>
+                    {conditionLabel && (
+                      <span className="border border-ink/40 bg-ink/5 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-ink">
+                        {conditionLabel}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-sm tabular-nums">
+                    <span className="text-ink/70">
+                      {formatPence(it.unit_price_pence)} {"×"} {it.quantity}
+                    </span>
+                    <span className="font-bold text-ink">
+                      {formatPence(it.line_total_pence)}
+                    </span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </div>
 
