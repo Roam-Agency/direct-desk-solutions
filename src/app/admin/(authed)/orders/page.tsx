@@ -287,9 +287,10 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
         </div>
       )}
 
-      {/* Table */}
+      {/* Table — desktop / tablet. Hidden on phones; the card list below
+          replaces it so the 5 columns don't force horizontal scrolling. */}
       {!error && orders.length > 0 && (
-        <div className="overflow-x-auto border border-rule">
+        <div className="hidden overflow-x-auto border border-rule sm:block">
           <table className="min-w-full divide-y divide-rule">
             <thead className="bg-ink/5">
               <tr>
@@ -359,6 +360,53 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* Card list — mobile only. Each order as a stacked card. */}
+      {!error && orders.length > 0 && (
+        <ul className="divide-y divide-rule border border-rule sm:hidden">
+          {orders.map((o) => (
+            <li
+              key={o.id}
+              className={
+                o.status === "backorder"
+                  ? "border-l-4 border-l-brand-red"
+                  : undefined
+              }
+            >
+              <Link
+                href={`/admin/orders/${o.id}`}
+                className="block p-3 transition hover:bg-ink/5"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <span className="min-w-0">
+                    <span className="font-mono font-bold text-ink">
+                      {o.id.slice(0, 8)}
+                    </span>
+                    {o.customer && (
+                      <span className="mt-1 block truncate text-sm text-ink/70">
+                        {o.customer.email}
+                      </span>
+                    )}
+                  </span>
+                  <span className="shrink-0 text-right">
+                    <span className="block font-bold tabular-nums text-ink">
+                      {formatPence(o.total_pence)}
+                    </span>
+                  </span>
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <span className={statusBadgeClasses(o.status)}>
+                    {o.status}
+                  </span>
+                  <span className="text-xs text-ink/50 tabular-nums">
+                    {formatDate(o.created_at)}
+                  </span>
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
