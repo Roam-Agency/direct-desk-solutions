@@ -18,14 +18,23 @@ export const metadata: Metadata = {
 
 export default async function PublicHomePage() {
   // Fetch in parallel — both helpers hit Supabase independently.
-  // The 'Just in' reel shows the newest used products (the core of the
-  // business). listLiveProducts returns newest-first by default; we take
-  // the first three to match the section's three-up layout.
-  const [counts, latestUsed] = await Promise.all([
+  // The 'Just in' reel shows the newest live products across both
+  // conditions (new and used). listLiveProducts filters by a single
+  // condition, so we fetch each and merge. Each call returns newest-first;
+  // we re-sort the combined list by publish date and take the first three
+  // to match the section's three-up layout.
+  const [counts, latestUsed, latestNew] = await Promise.all([
     countLiveProductsByCondition(),
     listLiveProducts({ condition: "used" }),
+    listLiveProducts({ condition: "new" }),
   ]);
-  const reelProducts = latestUsed.slice(0, 3);
+  const reelProducts = [...latestUsed, ...latestNew]
+    .sort((a, b) => {
+      const aDate = a.published_at ?? a.created_at;
+      const bDate = b.published_at ?? b.created_at;
+      return bDate.localeCompare(aDate);
+    })
+    .slice(0, 3);
 
   return (
     <>
@@ -104,7 +113,7 @@ export default async function PublicHomePage() {
         </div>
       </section>
 
-      {/* ===== 3. Just in — newest used products reel ===== */}
+      {/* ===== 3. Just in — newest live products reel (new + used) ===== */}
       {reelProducts.length > 0 && (
         <section className="bg-paper border-t border-rule">
           <div className="mx-auto max-w-7xl px-6 py-16 lg:py-24">
