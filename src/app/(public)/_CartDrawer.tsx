@@ -85,7 +85,7 @@ export default function CartDrawer() {
         aria-modal={open ? "true" : undefined}
         aria-label="Shopping basket"
         aria-hidden={!open}
-        className={`fixed top-0 right-0 bottom-0 z-[60] w-full sm:w-[400px] bg-paper border-l border-rule flex flex-col transition-transform duration-300 ease-out ${
+        className={`fixed top-0 right-0 bottom-0 z-[60] w-full sm:max-w-[400px] md:max-w-[440px] bg-paper border-l border-rule flex flex-col transition-transform duration-300 ease-out ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
       >

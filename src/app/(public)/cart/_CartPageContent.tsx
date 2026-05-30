@@ -185,7 +185,7 @@ export default function CartPageContent() {
 
       {/* Order summary */}
       <div className="lg:col-span-4 mt-10 lg:mt-0">
-        <div className="border border-rule p-6 sticky top-20">
+        <div className="border border-rule p-6 sticky top-16">
           <p className="text-[11px] uppercase tracking-[0.22em] font-bold text-ink mb-4">
             Order summary
           </p>
