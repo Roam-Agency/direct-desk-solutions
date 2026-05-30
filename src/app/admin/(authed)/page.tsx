@@ -173,12 +173,14 @@ export default async function AdminDashboard() {
         <DashboardDropZone />
       </div>
 
-      {/* Block B — 4-up stats */}
-      <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Block B — catalogue stats. 2-up on mobile (compact + scannable)
+          rather than a single column of tall, empty cards; 4-up at lg+. */}
+      <div className="mt-10 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCard
           label="Live products"
           value={liveCount}
           href="/admin/products?status=live"
+          tone="positive"
         />
         <StatCard
           label="Drafts"
@@ -194,6 +196,7 @@ export default async function AdminDashboard() {
           label="Low-stock alerts"
           value={lowStockCount}
           href="/admin/products"
+          tone={lowStockCount > 0 ? "alert" : "default"}
           sublabel={lowStockCount > 0 ? "Below threshold" : undefined}
         />
       </div>
@@ -224,7 +227,7 @@ export default async function AdminDashboard() {
       ) : null}
 
       {/* Sales — from orders table */}
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCard
           label={`Net revenue ${financial.sales.windowDays}d`}
           value={formatPence(financial.sales.netPence)}
@@ -249,7 +252,7 @@ export default async function AdminDashboard() {
 
       {/* Cash — from Stripe. Only rendered when available. */}
       {financial.cash !== null ? (
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
           <StatCard
             label="Stripe available"
             value={formatPence(financial.cash.availablePence)}
