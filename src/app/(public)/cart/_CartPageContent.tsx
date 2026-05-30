@@ -185,7 +185,7 @@ export default function CartPageContent() {
 
       {/* Order summary */}
       <div className="lg:col-span-4 mt-10 lg:mt-0">
-        <div className="border border-rule p-6 sticky top-20">
+        <div className="border border-rule p-6 sticky top-16">
           <p className="text-[11px] uppercase tracking-[0.22em] font-bold text-ink mb-4">
             Order summary
           </p>
@@ -336,8 +336,10 @@ function CartLine({
           </p>
         )}
 
-        {/* Bottom row: qty + line total + remove */}
-        <div className="flex items-center justify-between mt-3">
+        {/* Bottom row: qty + line total + remove. flex-wrap so on a narrow
+            phone the qty stepper and the price/remove group drop onto
+            separate lines instead of overflowing the row. */}
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 mt-3">
           {showQtyStepper ? (
             <div className="flex items-center border border-ink/20">
               <button
