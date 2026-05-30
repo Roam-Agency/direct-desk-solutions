@@ -78,7 +78,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           )}
           <button
             type="submit"
-            className="bg-ink text-paper px-6 py-3 text-xs uppercase tracking-[0.22em] font-bold hover:bg-brand-red transition-colors"
+            className="bg-ink text-paper px-4 py-3 text-xs uppercase tracking-[0.22em] font-bold hover:bg-brand-red transition-colors sm:px-6"
           >
             Search
           </button>

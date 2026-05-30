@@ -101,8 +101,8 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
       {/* Filters row \u2014 search box + sort dropdown */}
       <div className="flex flex-wrap items-end gap-4">
         {/* Search */}
-        <form method="get" action="/admin/customers" className="flex items-end gap-2">
-          <label className="block">
+        <form method="get" action="/admin/customers" className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <label className="block w-full sm:w-auto">
             <span className="block text-xs font-bold uppercase tracking-widest text-ink/60">
               Search by email
             </span>
@@ -111,7 +111,7 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
               name="search"
               defaultValue={search}
               placeholder="hello@example.com"
-              className="mt-1 w-64 border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder-ink/30 focus:border-ink focus:outline-none"
+              className="mt-1 w-full border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder-ink/30 focus:border-ink focus:outline-none sm:w-64"
             />
           </label>
           {/* Preserve sort across search submits */}

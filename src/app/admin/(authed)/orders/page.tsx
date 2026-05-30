@@ -203,8 +203,8 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
         <form
           method="get"
           action="/admin/orders"
-          className="flex items-end gap-2">
-          <label className="block">
+          className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <label className="block w-full sm:w-auto">
             <span className="block text-xs font-bold uppercase tracking-widest text-ink/60">
               Search by email or order ID
             </span>
@@ -213,7 +213,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
               name="search"
               defaultValue={search}
               placeholder="hello@example.com or abcd1234"
-              className="mt-1 w-72 border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder-ink/30 focus:border-ink focus:outline-none"
+              className="mt-1 w-full border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder-ink/30 focus:border-ink focus:outline-none sm:w-72"
             />
           </label>
           {/* Preserve status + sort across search submits */}

@@ -668,7 +668,7 @@ export default function ProductForm({
           />
         </Field>
         <Field label="Dimensions (cm)" error={fieldErrors.dimensions}>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <input
               type="text"
               inputMode="decimal"
@@ -795,11 +795,11 @@ export default function ProductForm({
         className={
           isBottomVisible
             ? "hidden"
-            : "fixed bottom-0 left-0 right-0 z-40 border-t-2 border-ink bg-paper px-6 py-4 shadow-[0_-2px_8px_rgba(0,0,0,0.05)]"
+            : "fixed bottom-0 left-0 right-0 z-40 border-t-2 border-ink bg-paper px-4 py-3 shadow-[0_-2px_8px_rgba(0,0,0,0.05)] sm:px-6 sm:py-4"
         }
         aria-hidden={isBottomVisible}
       >
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
+        <div className="mx-auto flex max-w-6xl flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <span className="text-xs font-bold uppercase tracking-widest text-ink/60">
             {isEdit ? "Editing product" : "New product"}
           </span>

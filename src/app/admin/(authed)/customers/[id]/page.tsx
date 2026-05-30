@@ -163,7 +163,7 @@ export default async function CustomerDetailPage({
       </div>
 
       {/* Aggregates strip */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div className="border border-rule bg-paper px-4 py-3">
           <div className="text-xs font-bold uppercase tracking-widest text-ink/60">
             Total orders
