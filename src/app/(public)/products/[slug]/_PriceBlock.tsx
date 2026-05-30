@@ -31,7 +31,7 @@ export default function PriceBlock({
 
   return (
     <div className="space-y-1">
-      <p className="font-display text-5xl sm:text-6xl tracking-tight leading-none text-ink">
+      <p className="font-display text-4xl sm:text-5xl lg:text-6xl tracking-tight leading-none text-ink">
         {formatPence(price_pence)}
       </p>
       {showSavings && (

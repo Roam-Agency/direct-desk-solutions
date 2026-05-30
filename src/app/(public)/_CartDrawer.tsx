@@ -224,7 +224,7 @@ function CartLineItem({
       <Link
         href={`/products/${item.slug}`}
         onClick={onNavigate}
-        className="relative w-20 h-20 flex-shrink-0 bg-rule/40 overflow-hidden"
+        className="relative h-16 w-16 sm:h-20 sm:w-20 flex-shrink-0 bg-rule/40 overflow-hidden"
         aria-label={`View ${item.name}`}
       >
         {item.heroUrl ? (

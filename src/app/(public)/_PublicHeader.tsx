@@ -164,7 +164,7 @@ export default function PublicHeader({
                   <Link
                     href={link.href}
                     onClick={() => setOpen(false)}
-                    className="block text-3xl font-black uppercase tracking-tight hover:text-brand-red transition-colors"
+                    className="block text-2xl sm:text-3xl font-black uppercase tracking-tight hover:text-brand-red transition-colors"
                   >
                     {link.label}
                   </Link>

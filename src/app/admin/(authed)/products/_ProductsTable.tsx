@@ -165,8 +165,8 @@ export function ProductsTable({
         onClear={() => setSelected(new Set())}
       />
 
-      <div className="overflow-hidden border border-rule">
-        <table className="w-full">
+      <div className="overflow-x-auto border border-rule">
+        <table className="w-full min-w-[40rem]">
           <thead className="bg-ink text-paper">
             <tr>
               <th className="w-10 px-4 py-3 text-left">
