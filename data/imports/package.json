@@ -1,0 +1,6 @@
+{
+  "//": "Marks the importer as an ES module so `node` doesn't warn. This folder is standalone ops tooling, not part of the Next app build.",
+  "name": "dds-catalogue-import",
+  "private": true,
+  "type": "module"
+}

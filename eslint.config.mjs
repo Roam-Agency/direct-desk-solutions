@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Standalone ops tooling — run directly with `node`, not part of the
+    // Next app build, so it isn't subject to the app's lint rules.
+    "data/imports/**",
   ]),
   // Respect the underscore-prefix convention for intentionally-unused
   // identifiers. Variables, function args, and destructured array members
