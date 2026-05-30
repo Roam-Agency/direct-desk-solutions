@@ -23,6 +23,7 @@ interface ProductsPageProps {
     condition?: string;
     page?: string;
     size?: string;
+    q?: string;
   }>;
 }
 
@@ -48,19 +49,26 @@ function normalisePageSize(raw: string | undefined): number {
     : DEFAULT_PAGE_SIZE;
 }
 
+function normaliseSearch(raw: string | undefined): string {
+  // Trim and cap length — admin search has no need for huge inputs.
+  return (raw ?? "").trim().slice(0, 100);
+}
+
 /**
- * Build a /admin/products?status=...&condition=...&page=...&size=... URL
+ * Build a /admin/products?status=...&condition=...&page=...&size=...&q=... URL
  * preserving the other filters. Changing the status, condition, or page size
  * resets to page 1 (the old page number is meaningless against a different
  * result set or page size); passing an explicit page keeps everything else
- * and just jumps pages. `size` is only written when it differs from the
- * default so the common URL stays clean.
+ * and just jumps pages. `size` and `q` are only written when set/non-default
+ * so the common URL stays clean. The active search `q` rides along on every
+ * link so filtering and paging stay scoped to the search.
  */
 function buildHref(
   currentStatus: StatusFilter,
   currentCondition: ConditionFilter,
   currentPage: number,
   currentSize: number,
+  currentSearch: string,
   patch: {
     status?: StatusFilter;
     condition?: ConditionFilter;
@@ -81,6 +89,7 @@ function buildHref(
   if (status !== "all") params.set("status", status);
   if (condition !== "all") params.set("condition", condition);
   if (size !== DEFAULT_PAGE_SIZE) params.set("size", String(size));
+  if (currentSearch) params.set("q", currentSearch);
   if (page > 1) params.set("page", String(page));
   const qs = params.toString();
   return qs ? `/admin/products?${qs}` : "/admin/products";
@@ -92,6 +101,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const condition = normaliseCondition(params.condition);
   const page = normalisePage(params.page);
   const pageSize = normalisePageSize(params.size);
+  const search = normaliseSearch(params.q);
 
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
@@ -109,6 +119,17 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   if (status === "all") query = query.neq("status", "archived");
   else query = query.eq("status", status);
   if (condition !== "all") query = query.eq("condition", condition);
+
+  // Free-text search across name + SKU. Escape ilike metacharacters (% _ \)
+  // so a search for "100%" or "BUND_1" is treated literally, not as a
+  // wildcard. ilike over ~14k rows is a few ms — no index needed; revisit
+  // with a tsvector/trigram index only if the catalogue grows orders of
+  // magnitude or we want ranked relevance.
+  if (search) {
+    const escaped = search.replace(/[\\%_]/g, "\\$&");
+    const pattern = `%${escaped}%`;
+    query = query.or(`name.ilike.${pattern},sku.ilike.${pattern}`);
+  }
 
   const { data: products, count, error } = await query;
 
@@ -143,6 +164,50 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     <div>
       <SectionHeader eyebrow="Catalogue" title="Products" />
 
+      {/* Search by name or SKU. GET form so the query lands in the URL (?q=)
+          and composes with the status/condition filters + pagination, which
+          all read from searchParams. Status/condition/size ride along as
+          hidden inputs so submitting a search doesn't drop the active
+          filters; page is intentionally omitted so a new search starts at
+          page 1. */}
+      <form method="get" action="/admin/products" className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center">
+        {status !== "all" && <input type="hidden" name="status" value={status} />}
+        {condition !== "all" && (
+          <input type="hidden" name="condition" value={condition} />
+        )}
+        {pageSize !== DEFAULT_PAGE_SIZE && (
+          <input type="hidden" name="size" value={String(pageSize)} />
+        )}
+        <input
+          type="search"
+          name="q"
+          defaultValue={search}
+          placeholder="Search name or SKU…"
+          maxLength={100}
+          aria-label="Search products by name or SKU"
+          className="w-full border border-rule bg-paper px-3 py-2 text-sm text-ink placeholder-ink/40 focus:border-ink focus:outline-none sm:w-80"
+        />
+        <button
+          type="submit"
+          className="border border-ink bg-ink px-4 py-2 text-xs font-bold uppercase tracking-widest text-paper transition hover:bg-brand-red"
+        >
+          Search
+        </button>
+        {search && (
+          <Link
+            href={buildHref("all", "all", 1, pageSize, "", {
+              status,
+              condition,
+            })}
+            prefetch={false}
+            className="flex items-center px-2 py-2 text-xs font-bold uppercase tracking-widest text-ink/50 transition hover:text-brand-red"
+          >
+            Clear
+            <LoadingHint />
+          </Link>
+        )}
+      </form>
+
       <div className="mt-6 flex flex-wrap items-center gap-x-8 gap-y-4">
         <Tabs
           label="Status"
@@ -154,7 +219,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           ]}
           current={status}
           buildHref={(v) =>
-            buildHref(status, condition, page, pageSize, {
+            buildHref(status, condition, page, pageSize, search, {
               status: v as StatusFilter,
             })
           }
@@ -168,18 +233,24 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           ]}
           current={condition}
           buildHref={(v) =>
-            buildHref(status, condition, page, pageSize, {
+            buildHref(status, condition, page, pageSize, search, {
               condition: v as ConditionFilter,
             })
           }
         />
       </div>
 
+      {search && (
+        <p className="mt-4 text-xs font-bold uppercase tracking-widest text-ink/50">
+          {totalCount} result{totalCount === 1 ? "" : "s"} for “{search}”
+        </p>
+      )}
+
       <div className="mt-8">
         {error ? (
           <ErrorState message={error.message} />
         ) : !products || products.length === 0 ? (
-          <EmptyState />
+          <EmptyState search={search} />
         ) : (
           <>
             <ViewSwitcher
@@ -199,10 +270,10 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               totalCount={totalCount}
               pageSize={pageSize}
               hrefFor={(p) =>
-                buildHref(status, condition, page, pageSize, { page: p })
+                buildHref(status, condition, page, pageSize, search, { page: p })
               }
               hrefForSize={(s) =>
-                buildHref(status, condition, page, pageSize, { size: s })
+                buildHref(status, condition, page, pageSize, search, { size: s })
               }
             />
           </>
@@ -349,7 +420,19 @@ function Pagination({
   );
 }
 
-function EmptyState() {
+function EmptyState({ search }: { search: string }) {
+  if (search) {
+    return (
+      <div className="border border-dashed border-rule bg-paper px-6 py-16 text-center">
+        <p className="text-xs font-bold uppercase tracking-widest text-ink/40">
+          No products match “{search}”
+        </p>
+        <p className="mt-2 text-sm text-ink/60">
+          Try a different name or SKU, or clear the search.
+        </p>
+      </div>
+    );
+  }
   return (
     <div className="border border-dashed border-rule bg-paper px-6 py-16 text-center">
       <p className="text-xs font-bold uppercase tracking-widest text-ink/40">

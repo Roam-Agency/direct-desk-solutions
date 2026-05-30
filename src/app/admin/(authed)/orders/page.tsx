@@ -225,7 +225,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
           )}
           <button
             type="submit"
-            className="border border-ink bg-paper px-4 py-2 text-xs font-bold uppercase tracking-widest text-ink transition hover:bg-ink hover:text-paper">
+            className="border border-ink bg-ink px-4 py-2 text-xs font-bold uppercase tracking-widest text-paper transition hover:bg-brand-red hover:border-brand-red">
             Search
           </button>
           {search && (
