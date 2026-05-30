@@ -123,39 +123,62 @@ export default async function CategoriesPage({ searchParams }: PageProps) {
                 No {KIND_TITLES[kind].toLowerCase()} categories yet.
               </p>
             ) : (
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-rule text-left text-xs font-bold uppercase tracking-widest text-ink/60">
-                    <th className="py-2 pr-4">Name</th>
-                    <th className="py-2 pr-4">Slug</th>
-                    <th className="py-2 pr-4">Products</th>
-                    <th className="py-2 pr-4">Order</th>
-                    <th className="py-2 pr-4">Status</th>
-                    <th className="py-2 text-right" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {tops.flatMap((top) => {
-                    const children = childrenByParent.get(top.id) ?? [];
-                    return [
-                      <CategoryRow
-                        key={top.id}
-                        category={top}
-                        productCount={productCounts.get(top.id) ?? 0}
-                        depth={0}
-                      />,
-                      ...children.map((child) => (
-                        <CategoryRow
-                          key={child.id}
-                          category={child}
-                          productCount={productCounts.get(child.id) ?? 0}
-                          depth={1}
+              (() => {
+                // Flatten tops + their children into one ordered, depth-tagged
+                // list so the table and the mobile card list render from the
+                // same source.
+                const ordered = tops.flatMap((top) => [
+                  { category: top, depth: 0 },
+                  ...(childrenByParent.get(top.id) ?? []).map((child) => ({
+                    category: child,
+                    depth: 1,
+                  })),
+                ]);
+
+                return (
+                  <>
+                    {/* Desktop / tablet: full table. Hidden on phones, where
+                        the 6 columns overflow and the Status/actions column is
+                        clipped — the mobile card list below replaces it. */}
+                    <div className="hidden overflow-x-auto sm:block">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-rule text-left text-xs font-bold uppercase tracking-widest text-ink/60">
+                            <th className="py-2 pr-4">Name</th>
+                            <th className="py-2 pr-4">Slug</th>
+                            <th className="py-2 pr-4">Products</th>
+                            <th className="py-2 pr-4">Order</th>
+                            <th className="py-2 pr-4">Status</th>
+                            <th className="py-2 text-right" />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {ordered.map(({ category, depth }) => (
+                            <CategoryTableRow
+                              key={category.id}
+                              category={category}
+                              productCount={productCounts.get(category.id) ?? 0}
+                              depth={depth}
+                            />
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Mobile: stacked cards. */}
+                    <ul className="divide-y divide-rule border border-rule sm:hidden">
+                      {ordered.map(({ category, depth }) => (
+                        <CategoryCard
+                          key={category.id}
+                          category={category}
+                          productCount={productCounts.get(category.id) ?? 0}
+                          depth={depth}
                         />
-                      )),
-                    ];
-                  })}
-                </tbody>
-              </table>
+                      ))}
+                    </ul>
+                  </>
+                );
+              })()
             )}
           </section>
         );
@@ -164,7 +187,19 @@ export default async function CategoriesPage({ searchParams }: PageProps) {
   );
 }
 
-function CategoryRow({
+function StatusPill({ isActive }: { isActive: boolean }) {
+  return isActive ? (
+    <span className="inline-block bg-emerald-100 px-2 py-0.5 text-xs font-bold uppercase tracking-widest text-emerald-800">
+      Active
+    </span>
+  ) : (
+    <span className="inline-block bg-ink/10 px-2 py-0.5 text-xs font-bold uppercase tracking-widest text-ink/60">
+      Archived
+    </span>
+  );
+}
+
+function CategoryTableRow({
   category,
   productCount,
   depth,
@@ -198,15 +233,7 @@ function CategoryRow({
         {category.sort_order}
       </td>
       <td className="py-3 pr-4">
-        {category.is_active ? (
-          <span className="inline-block bg-emerald-100 px-2 py-0.5 text-xs font-bold uppercase tracking-widest text-emerald-800">
-            Active
-          </span>
-        ) : (
-          <span className="inline-block bg-ink/10 px-2 py-0.5 text-xs font-bold uppercase tracking-widest text-ink/60">
-            Archived
-          </span>
-        )}
+        <StatusPill isActive={category.is_active} />
       </td>
       <td className="py-3 text-right">
         <ArchiveButton
@@ -215,5 +242,58 @@ function CategoryRow({
         />
       </td>
     </tr>
+  );
+}
+
+/**
+ * Mobile equivalent of a table row. Name (with child indent) + status pill
+ * on the top line, then a metadata line (slug · products · order) and the
+ * archive/restore action — laid out vertically so nothing is clipped on a
+ * phone the way the 6-column table was.
+ */
+function CategoryCard({
+  category,
+  productCount,
+  depth,
+}: {
+  category: CategoryRow;
+  productCount: number;
+  depth: number;
+}) {
+  return (
+    <li className={depth > 0 ? "pl-4" : undefined}>
+      <div className="flex items-start justify-between gap-3 p-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            {depth > 0 && (
+              <span className="shrink-0 text-ink/30" aria-hidden>
+                └
+              </span>
+            )}
+            <Link
+              href={`/admin/categories/${category.id}`}
+              className="font-bold text-ink transition hover:text-brand-red"
+            >
+              {category.name}
+            </Link>
+          </div>
+          <p className="mt-1 break-all font-mono text-[11px] text-ink/50">
+            {category.slug}
+          </p>
+          <p className="mt-1 font-mono text-[11px] text-ink/60">
+            {productCount} product{productCount === 1 ? "" : "s"}
+            <span className="text-ink/30"> · </span>
+            order {category.sort_order}
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <StatusPill isActive={category.is_active} />
+          <ArchiveButton
+            categoryId={category.id}
+            isActive={category.is_active}
+          />
+        </div>
+      </div>
+    </li>
   );
 }
