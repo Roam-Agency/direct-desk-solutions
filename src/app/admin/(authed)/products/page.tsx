@@ -6,6 +6,7 @@ import { ProductGallery } from "./_ProductGallery";
 import { ProductsTable } from "./_ProductsTable";
 import { ViewSwitcher } from "./_ViewSwitcher";
 import { LoadingHint } from "./_LoadingHint";
+import { SortSelect } from "./_SortSelect";
 
 type StatusFilter = "all" | "live" | "draft" | "archived";
 type ConditionFilter = "all" | "new" | "used";
@@ -17,6 +18,21 @@ type ConditionFilter = "all" | "new" | "used";
 const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 const DEFAULT_PAGE_SIZE = 20;
 
+// Admin list sort options. Each maps to a Supabase order() column + direction.
+// Default is the most recently edited first — the daily-driver view.
+const SORT_OPTIONS = [
+  { value: "recent", label: "Recently edited", column: "updated_at", ascending: false },
+  { value: "name-asc", label: "Name A–Z", column: "name", ascending: true },
+  { value: "name-desc", label: "Name Z–A", column: "name", ascending: false },
+  { value: "price-asc", label: "Price: low to high", column: "price_pence", ascending: true },
+  { value: "price-desc", label: "Price: high to low", column: "price_pence", ascending: false },
+  { value: "stock-asc", label: "Stock: low to high", column: "stock_quantity", ascending: true },
+  { value: "stock-desc", label: "Stock: high to low", column: "stock_quantity", ascending: false },
+] as const;
+
+type SortValue = (typeof SORT_OPTIONS)[number]["value"];
+const DEFAULT_SORT: SortValue = "recent";
+
 interface ProductsPageProps {
   searchParams: Promise<{
     status?: string;
@@ -24,6 +40,7 @@ interface ProductsPageProps {
     page?: string;
     size?: string;
     q?: string;
+    sort?: string;
   }>;
 }
 
@@ -54,6 +71,12 @@ function normaliseSearch(raw: string | undefined): string {
   return (raw ?? "").trim().slice(0, 100);
 }
 
+function normaliseSort(raw: string | undefined): SortValue {
+  return SORT_OPTIONS.some((o) => o.value === raw)
+    ? (raw as SortValue)
+    : DEFAULT_SORT;
+}
+
 /**
  * Build a /admin/products?status=...&condition=...&page=...&size=...&q=... URL
  * preserving the other filters. Changing the status, condition, or page size
@@ -69,20 +92,24 @@ function buildHref(
   currentPage: number,
   currentSize: number,
   currentSearch: string,
+  currentSort: SortValue,
   patch: {
     status?: StatusFilter;
     condition?: ConditionFilter;
     page?: number;
     size?: number;
+    sort?: SortValue;
   }
 ): string {
   const status = patch.status ?? currentStatus;
   const condition = patch.condition ?? currentCondition;
   const size = patch.size ?? currentSize;
+  const sort = patch.sort ?? currentSort;
   const filterChanged =
     patch.status !== undefined ||
     patch.condition !== undefined ||
-    patch.size !== undefined;
+    patch.size !== undefined ||
+    patch.sort !== undefined;
   const page = patch.page ?? (filterChanged ? 1 : currentPage);
 
   const params = new URLSearchParams();
@@ -90,6 +117,7 @@ function buildHref(
   if (condition !== "all") params.set("condition", condition);
   if (size !== DEFAULT_PAGE_SIZE) params.set("size", String(size));
   if (currentSearch) params.set("q", currentSearch);
+  if (sort !== DEFAULT_SORT) params.set("sort", sort);
   if (page > 1) params.set("page", String(page));
   const qs = params.toString();
   return qs ? `/admin/products?${qs}` : "/admin/products";
@@ -102,6 +130,9 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const page = normalisePage(params.page);
   const pageSize = normalisePageSize(params.size);
   const search = normaliseSearch(params.q);
+  const sort = normaliseSort(params.sort);
+  const sortOption =
+    SORT_OPTIONS.find((o) => o.value === sort) ?? SORT_OPTIONS[0];
 
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
@@ -110,7 +141,10 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   let query = supabase
     .from("products")
     .select("*", { count: "exact" })
-    .order("updated_at", { ascending: false })
+    .order(sortOption.column, { ascending: sortOption.ascending })
+    // Stable secondary key so rows with equal sort values (e.g. same price)
+    // keep a deterministic order across pages.
+    .order("id", { ascending: true })
     .range(from, to);
 
   // "All" means the working catalogue (live + draft). Archived products
@@ -178,6 +212,9 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         {pageSize !== DEFAULT_PAGE_SIZE && (
           <input type="hidden" name="size" value={String(pageSize)} />
         )}
+        {sort !== DEFAULT_SORT && (
+          <input type="hidden" name="sort" value={sort} />
+        )}
         <input
           type="search"
           name="q"
@@ -195,7 +232,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         </button>
         {search && (
           <Link
-            href={buildHref("all", "all", 1, pageSize, "", {
+            href={buildHref("all", "all", 1, pageSize, "", sort, {
               status,
               condition,
             })}
@@ -219,7 +256,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           ]}
           current={status}
           buildHref={(v) =>
-            buildHref(status, condition, page, pageSize, search, {
+            buildHref(status, condition, page, pageSize, search, sort, {
               status: v as StatusFilter,
             })
           }
@@ -233,10 +270,26 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           ]}
           current={condition}
           buildHref={(v) =>
-            buildHref(status, condition, page, pageSize, search, {
+            buildHref(status, condition, page, pageSize, search, sort, {
               condition: v as ConditionFilter,
             })
           }
+        />
+
+        <SortSelect
+          current={sort}
+          options={SORT_OPTIONS.map((o) => ({
+            value: o.value,
+            label: o.label,
+          }))}
+          hrefByValue={Object.fromEntries(
+            SORT_OPTIONS.map((o) => [
+              o.value,
+              buildHref(status, condition, page, pageSize, search, sort, {
+                sort: o.value,
+              }),
+            ])
+          )}
         />
       </div>
 
@@ -270,10 +323,14 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               totalCount={totalCount}
               pageSize={pageSize}
               hrefFor={(p) =>
-                buildHref(status, condition, page, pageSize, search, { page: p })
+                buildHref(status, condition, page, pageSize, search, sort, {
+                  page: p,
+                })
               }
               hrefForSize={(s) =>
-                buildHref(status, condition, page, pageSize, search, { size: s })
+                buildHref(status, condition, page, pageSize, search, sort, {
+                  size: s,
+                })
               }
             />
           </>
