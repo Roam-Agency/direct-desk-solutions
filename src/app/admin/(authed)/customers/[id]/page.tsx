@@ -141,8 +141,8 @@ export default async function CustomerDetailPage({
       {/* Header */}
       <div className="border-b border-rule pb-6">
         <div className="flex items-start justify-between gap-6">
-          <div>
-            <h1 className="text-3xl font-black tracking-tight">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight break-words">
               {customer.email}
             </h1>
             <p className="mt-2 text-sm text-ink/80">
