@@ -336,8 +336,10 @@ function CartLine({
           </p>
         )}
 
-        {/* Bottom row: qty + line total + remove */}
-        <div className="flex items-center justify-between mt-3">
+        {/* Bottom row: qty + line total + remove. flex-wrap so on a narrow
+            phone the qty stepper and the price/remove group drop onto
+            separate lines instead of overflowing the row. */}
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 mt-3">
           {showQtyStepper ? (
             <div className="flex items-center border border-ink/20">
               <button
