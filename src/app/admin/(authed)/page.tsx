@@ -328,12 +328,12 @@ function RecentProductsColumn({
                       alt={hero.alt ?? row.name}
                       width={48}
                       height={48}
-                      className="h-12 w-12 border border-rule object-cover"
+                      className="h-12 w-12 shrink-0 border border-rule object-cover"
                       loading="lazy"
                     />
                   ) : (
                     <div
-                      className="h-12 w-12 border border-rule bg-rule/40"
+                      className="h-12 w-12 shrink-0 border border-rule bg-rule/40"
                       aria-hidden
                     />
                   )}
@@ -343,7 +343,9 @@ function RecentProductsColumn({
                       Edited {formatTimeAgo(row.updated_at)}
                     </p>
                   </div>
-                  <StatusPill tone={row.status}>{row.status}</StatusPill>
+                  <span className="shrink-0">
+                    <StatusPill tone={row.status}>{row.status}</StatusPill>
+                  </span>
                 </Link>
               </li>
             );
@@ -402,7 +404,7 @@ function RecentOrdersColumn({ rows }: { rows: RecentOrderRow[] }) {
                       Placed {formatTimeAgo(row.created_at)}
                     </p>
                   </div>
-                  <div className="flex flex-col items-end gap-1">
+                  <div className="flex shrink-0 flex-col items-end gap-1">
                     <span className="font-bold tabular-nums text-ink">
                       {formatPence(row.total_pence)}
                     </span>

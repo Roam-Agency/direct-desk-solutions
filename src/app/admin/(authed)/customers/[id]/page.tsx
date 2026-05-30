@@ -206,8 +206,10 @@ export default async function CustomerDetailPage({
           </h2>
           <dl className="mt-3 space-y-2 text-sm">
             <div className="flex justify-between gap-4">
-              <dt className="text-ink/60">Email</dt>
-              <dd className="font-bold">{customer.email}</dd>
+              <dt className="shrink-0 text-ink/60">Email</dt>
+              <dd className="min-w-0 break-all text-right font-bold">
+                {customer.email}
+              </dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-ink/60">Phone</dt>
