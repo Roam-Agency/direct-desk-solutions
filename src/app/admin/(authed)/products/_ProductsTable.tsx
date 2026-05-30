@@ -165,7 +165,10 @@ export function ProductsTable({
         onClear={() => setSelected(new Set())}
       />
 
-      <div className="overflow-x-auto border border-rule">
+      {/* Desktop / tablet: the full data table. Hidden on phones, where a
+          9-column table is unreadable — the mobile card list below replaces
+          it. Both share the same selection state + bulk-action bar. */}
+      <div className="hidden overflow-x-auto border border-rule sm:block">
         <table className="w-full min-w-[40rem]">
           <thead className="bg-ink text-paper">
             <tr>
@@ -249,6 +252,68 @@ export function ProductsTable({
           </tbody>
         </table>
       </div>
+
+      {/* Mobile: stacked cards. A table forces horizontal scroll on a phone
+          and balloons each row to many lines; this lays each product out
+          vertically — checkbox + thumbnail + clamped name on top, then a
+          metadata line (SKU · price · stock) and the status pill. */}
+      <ul className="divide-y divide-rule border border-rule sm:hidden">
+        {rows.map((row) => {
+          const hero = heroes[row.id] ?? null;
+          const isSelected = selected.has(row.id);
+          return (
+            <li
+              key={row.id}
+              className={isSelected ? "bg-rule/50" : undefined}
+            >
+              <div className="flex items-start gap-3 p-3">
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => toggleOne(row.id)}
+                  aria-label={`Select ${row.name}`}
+                  className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-brand-red"
+                />
+                <Link
+                  href={`/admin/products/${row.id}`}
+                  className="flex min-w-0 flex-1 items-start gap-3"
+                >
+                  <span className="shrink-0">
+                    <ProductThumbnail hero={hero} productName={row.name} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-bold leading-snug text-ink line-clamp-2">
+                      {row.name}
+                    </span>
+                    <span className="mt-1 block font-mono text-[11px] text-ink/50">
+                      {row.sku}
+                    </span>
+                    <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                      <span className="font-bold tabular-nums text-ink">
+                        {formatPence(row.price_pence)}
+                      </span>
+                      <span className="text-ink/40">·</span>
+                      <span className="tabular-nums text-ink/70">
+                        Stock {row.stock_quantity}
+                      </span>
+                      <span className="text-ink/40">·</span>
+                      <span className="text-ink/70">
+                        <ConditionLabel
+                          condition={row.condition}
+                          grade={row.condition_grade}
+                        />
+                      </span>
+                    </span>
+                  </span>
+                  <span className="shrink-0">
+                    <StatusLabel status={row.status} />
+                  </span>
+                </Link>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
