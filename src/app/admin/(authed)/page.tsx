@@ -276,8 +276,12 @@ export default async function AdminDashboard() {
         </div>
       ) : null}
 
-      {/* Block C — Recent activity */}
-      <div className="mt-12 grid gap-8 lg:grid-cols-2">
+      {/* Block C — Recent activity.
+          grid-cols-1 (not a bare `grid`) so the mobile track is minmax(0,1fr)
+          and can shrink — a bare implicit `auto` track grows to the longest
+          product name and overflows the viewport, defeating the rows' own
+          truncate. */}
+      <div className="mt-12 grid grid-cols-1 gap-8 lg:grid-cols-2">
         <RecentProductsColumn
           rows={recentProducts as RecentProductRow[]}
           heroByProductId={heroByProductId}
@@ -303,7 +307,7 @@ function RecentProductsColumn({
   heroByProductId: Map<string, { url: string; alt: string | null }>;
 }) {
   return (
-    <section>
+    <section className="min-w-0">
       <h2 className="text-xs font-bold uppercase tracking-widest text-ink/60">
         Recently edited products
       </h2>
@@ -328,12 +332,12 @@ function RecentProductsColumn({
                       alt={hero.alt ?? row.name}
                       width={48}
                       height={48}
-                      className="h-12 w-12 border border-rule object-cover"
+                      className="h-12 w-12 shrink-0 border border-rule object-cover"
                       loading="lazy"
                     />
                   ) : (
                     <div
-                      className="h-12 w-12 border border-rule bg-rule/40"
+                      className="h-12 w-12 shrink-0 border border-rule bg-rule/40"
                       aria-hidden
                     />
                   )}
@@ -343,7 +347,9 @@ function RecentProductsColumn({
                       Edited {formatTimeAgo(row.updated_at)}
                     </p>
                   </div>
-                  <StatusPill tone={row.status}>{row.status}</StatusPill>
+                  <span className="shrink-0">
+                    <StatusPill tone={row.status}>{row.status}</StatusPill>
+                  </span>
                 </Link>
               </li>
             );
@@ -368,7 +374,7 @@ type RecentOrderRow = {
 
 function RecentOrdersColumn({ rows }: { rows: RecentOrderRow[] }) {
   return (
-    <section>
+    <section className="min-w-0">
       <h2 className="text-xs font-bold uppercase tracking-widest text-ink/60">
         Recent orders
       </h2>
@@ -402,7 +408,7 @@ function RecentOrdersColumn({ rows }: { rows: RecentOrderRow[] }) {
                       Placed {formatTimeAgo(row.created_at)}
                     </p>
                   </div>
-                  <div className="flex flex-col items-end gap-1">
+                  <div className="flex shrink-0 flex-col items-end gap-1">
                     <span className="font-bold tabular-nums text-ink">
                       {formatPence(row.total_pence)}
                     </span>

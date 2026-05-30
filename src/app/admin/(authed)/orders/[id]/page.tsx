@@ -161,15 +161,15 @@ export default async function OrderDetailPage({ params }: OrderPageProps) {
             Order <span className="font-mono text-xl">{order.id.slice(0, 8)}</span>
           </h1>
           <p className="mt-1 font-mono text-xs text-ink/40">{order.id}</p>
-          <div className="mt-3 flex items-center gap-4">
-            <span className={statusBadgeClasses(order.status)}>
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <span className={`shrink-0 ${statusBadgeClasses(order.status)}`}>
               {order.status}
             </span>
             {order.customer && (
               <Link
                 href={`/admin/customers/${order.customer.id}`}
-                className="text-sm text-ink transition hover:text-brand-red">
-                <span className="font-bold">{order.customer.email}</span>
+                className="min-w-0 text-sm text-ink transition hover:text-brand-red">
+                <span className="font-bold break-all">{order.customer.email}</span>
                 <span className="ml-2 text-ink/60">
                   {customerName(order.customer)}
                 </span>

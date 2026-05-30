@@ -141,8 +141,8 @@ export default async function CustomerDetailPage({
       {/* Header */}
       <div className="border-b border-rule pb-6">
         <div className="flex items-start justify-between gap-6">
-          <div>
-            <h1 className="text-3xl font-black tracking-tight">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight break-words">
               {customer.email}
             </h1>
             <p className="mt-2 text-sm text-ink/80">
@@ -199,15 +199,17 @@ export default async function CustomerDetailPage({
       </div>
 
       {/* Contact + Latest address \u2014 two-column on desktop */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <div className="border border-rule bg-paper p-5">
           <h2 className="text-xs font-bold uppercase tracking-widest text-ink/60">
             Contact
           </h2>
           <dl className="mt-3 space-y-2 text-sm">
             <div className="flex justify-between gap-4">
-              <dt className="text-ink/60">Email</dt>
-              <dd className="font-bold">{customer.email}</dd>
+              <dt className="shrink-0 text-ink/60">Email</dt>
+              <dd className="min-w-0 break-all text-right font-bold">
+                {customer.email}
+              </dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-ink/60">Phone</dt>
