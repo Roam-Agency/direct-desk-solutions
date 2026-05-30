@@ -31,4 +31,9 @@ body {
   font-family: var(--font-sans);
   background: var(--paper);
   color: var(--ink);
+  /* Safety net: stop any single over-wide element (a long unbroken product
+     name in a grid/flex track, a wide element) from scrolling the entire
+     page sideways on mobile. Components still fix their own layout; this
+     just contains the blast radius so the whole page never drifts. */
+  overflow-x: hidden;
 }

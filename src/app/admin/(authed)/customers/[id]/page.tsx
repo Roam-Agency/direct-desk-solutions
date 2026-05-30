@@ -199,7 +199,7 @@ export default async function CustomerDetailPage({
       </div>
 
       {/* Contact + Latest address \u2014 two-column on desktop */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <div className="border border-rule bg-paper p-5">
           <h2 className="text-xs font-bold uppercase tracking-widest text-ink/60">
             Contact

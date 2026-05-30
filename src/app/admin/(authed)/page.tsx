@@ -276,8 +276,12 @@ export default async function AdminDashboard() {
         </div>
       ) : null}
 
-      {/* Block C — Recent activity */}
-      <div className="mt-12 grid gap-8 lg:grid-cols-2">
+      {/* Block C — Recent activity.
+          grid-cols-1 (not a bare `grid`) so the mobile track is minmax(0,1fr)
+          and can shrink — a bare implicit `auto` track grows to the longest
+          product name and overflows the viewport, defeating the rows' own
+          truncate. */}
+      <div className="mt-12 grid grid-cols-1 gap-8 lg:grid-cols-2">
         <RecentProductsColumn
           rows={recentProducts as RecentProductRow[]}
           heroByProductId={heroByProductId}
@@ -303,7 +307,7 @@ function RecentProductsColumn({
   heroByProductId: Map<string, { url: string; alt: string | null }>;
 }) {
   return (
-    <section>
+    <section className="min-w-0">
       <h2 className="text-xs font-bold uppercase tracking-widest text-ink/60">
         Recently edited products
       </h2>
@@ -370,7 +374,7 @@ type RecentOrderRow = {
 
 function RecentOrdersColumn({ rows }: { rows: RecentOrderRow[] }) {
   return (
-    <section>
+    <section className="min-w-0">
       <h2 className="text-xs font-bold uppercase tracking-widest text-ink/60">
         Recent orders
       </h2>
