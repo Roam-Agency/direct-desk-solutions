@@ -790,16 +790,23 @@ export default function ProductForm({
         </Section>
       )}
 
-      {/* Sticky save bar - mirrors Save + View on site when bottom row is off-screen */}
+      {/* Sticky save bar — slides up from the bottom when the in-form save
+          row scrolls out of view. Always rendered so it can animate: when the
+          in-form row is visible it's translated off-screen + made
+          non-interactive (pointer-events-none, tabIndex -1) rather than
+          display:none, so the slide runs both ways. Safe-area padding keeps
+          the button clear of the iOS home indicator. */}
       <div
         className={
-          isBottomVisible
-            ? "hidden"
-            : "fixed bottom-0 left-0 right-0 z-40 border-t-2 border-ink bg-paper px-4 py-3 shadow-[0_-2px_8px_rgba(0,0,0,0.05)] sm:px-6 sm:py-4"
+          "fixed inset-x-0 bottom-0 z-40 border-t-2 border-ink bg-paper/95 backdrop-blur-sm shadow-[0_-2px_12px_rgba(0,0,0,0.08)] transition-transform duration-300 ease-out " +
+          (isBottomVisible
+            ? "translate-y-full pointer-events-none"
+            : "translate-y-0")
         }
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         aria-hidden={isBottomVisible}
       >
-        <div className="mx-auto flex max-w-6xl flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6 sm:py-4">
           <span className="text-xs font-bold uppercase tracking-widest text-ink/60">
             {isEdit ? "Editing product" : "New product"}
           </span>
@@ -811,7 +818,8 @@ export default function ProductForm({
                   href={`/products/${initialProduct.slug}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs font-bold uppercase tracking-widest text-ink/60 underline transition hover:text-brand-red"
+                  tabIndex={isBottomVisible ? -1 : undefined}
+                  className="shrink-0 text-xs font-bold uppercase tracking-widest text-ink/60 underline transition hover:text-brand-red"
                 >
                   View on site →
                 </Link>
@@ -819,7 +827,8 @@ export default function ProductForm({
             <button
               type="submit"
               disabled={isPending}
-              className="bg-ink px-6 py-3 text-xs font-bold uppercase tracking-widest text-paper transition hover:bg-brand-red disabled:opacity-50"
+              tabIndex={isBottomVisible ? -1 : undefined}
+              className="flex-1 bg-ink px-6 py-3 text-xs font-bold uppercase tracking-widest text-paper transition hover:bg-brand-red disabled:opacity-50 sm:flex-none sm:px-8"
             >
               {isPending ? "Saving…" : isEdit ? "Save changes" : "Create product"}
             </button>

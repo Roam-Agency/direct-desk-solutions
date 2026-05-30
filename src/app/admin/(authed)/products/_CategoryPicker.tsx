@@ -46,8 +46,13 @@ export function CategoryPicker({
   onChange,
 }: Props) {
   const [query, setQuery] = useState("");
-  // Collapsed sections by kind. Default: all expanded (empty set).
-  const [collapsed, setCollapsed] = useState<Set<CategoryKind>>(new Set());
+  // Collapsed sections by kind. Default: all collapsed — the taxonomy is
+  // large, so the form stays compact until you open a section (or search,
+  // which force-expands matches). The "(n)" badge still shows selections
+  // inside a collapsed section.
+  const [collapsed, setCollapsed] = useState<Set<CategoryKind>>(
+    () => new Set(KIND_ORDER)
+  );
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
