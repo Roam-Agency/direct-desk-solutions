@@ -6,6 +6,7 @@ import {
   getPublishedConditionReport,
 } from "@/lib/products/fetch";
 import Breadcrumb from "../../_Breadcrumb";
+import BackLink from "../../_BackLink";
 import Gallery from "./_Gallery";
 import PriceBlock from "./_PriceBlock";
 import StockBadge from "./_StockBadge";
@@ -88,6 +89,13 @@ export default async function ProductDetailPage({ params }: PageProps) {
       ? { label: "Shop Used", href: "/products?condition=used" }
       : { label: "Shop New", href: "/products?condition=new" };
 
+  // Back-link target: the relevant listing page. Used as the fallback when
+  // there's no in-app history to go back to (deep link / fresh tab).
+  const backHref =
+    product.condition === "used" ? "/products/used" : "/products/new";
+  const backLabel =
+    product.condition === "used" ? "Back to Used" : "Back to New";
+
   // Hero image URL for the cart payload (StickyCTA passes this to the
   // store on add). Same selection logic as generateMetadata above:
   // explicit hero, else first image, else null. The two computations
@@ -113,14 +121,17 @@ export default async function ProductDetailPage({ params }: PageProps) {
           overlaps page content at scroll end. ~128px covers single-row
           CTA on tablet/desktop and CTA + mobile anchor link on phones. */}
       <div className="pb-32 lg:pb-16">
-        <div className="mx-auto max-w-7xl px-6 pt-6">
-          <Breadcrumb
-            items={[
-              { label: "Home", href: "/" },
-              conditionCrumb,
-              { label: product.name },
-            ]}
-          />
+        <div className="mx-auto max-w-7xl px-6 pt-4">
+          <BackLink fallbackHref={backHref} label={backLabel} />
+          <div className="mt-1">
+            <Breadcrumb
+              items={[
+                { label: "Home", href: "/" },
+                conditionCrumb,
+                { label: product.name },
+              ]}
+            />
+          </div>
         </div>
 
         {/* Hero region: at lg+ the gallery and product info sit side by
