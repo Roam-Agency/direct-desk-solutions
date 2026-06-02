@@ -9,8 +9,10 @@
  *     "Direct from corporate clear-outs".
  *   - Bullet 2 (Refurb): always "Refurbished in our UK workshop" —
  *     this is the brand's headline trust claim, not product-specific.
- *   - Bullet 3 (Warranty): always "12-month warranty included" —
- *     same as above. Comes from the briefs' "Why DDS" trio.
+ *   - Bullet 3 (Warranty): "3-month warranty included". These bullets
+ *     render for USED items only (see the product page's condition gate),
+ *     and the store's policy is 3-month on refurbished / 12-month on new —
+ *     so the used-only bullet must say 3, not 12.
  *
  * Future iterations could pull refurb_date or refurb-location into
  * the workshop bullet, but for v1 the static copy is stronger
@@ -26,7 +28,7 @@ type TrustBulletsProps = {
 
 const BULLETS = [
   { label: "Workshop", body: "Refurbished in our UK workshop" },
-  { label: "Warranty", body: "12-month warranty included" },
+  { label: "Warranty", body: "3-month warranty included" },
 ] as const;
 
 export default function TrustBullets({ source }: TrustBulletsProps) {
