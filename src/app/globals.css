@@ -25,6 +25,10 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  /* Paint the brand background from the very first frame so a cold load /
+     slow network shows the off-white paper, not the browser default (black
+     in dark mode) before the body + content arrive. */
+  background: var(--paper);
 }
 
 body {
