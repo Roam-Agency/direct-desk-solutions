@@ -3,6 +3,7 @@
 import { useTransition, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createDraftProduct } from "./_actions";
+import { describeActionFailure } from "@/lib/admin/action-errors";
 
 /**
  * "New product" CTA that creates a skeleton draft and redirects to its
@@ -28,15 +29,22 @@ export function DraftProductButton({
   function handleClick() {
     setError(null);
     startTransition(async () => {
-      const result = await createDraftProduct();
-      if (result.ok && result.id) {
-        router.push(`/admin/products/${result.id}`);
-      } else {
-        setError(
-          result.ok
-            ? "Created draft but no id returned"
-            : result.formError ?? "Could not create draft"
-        );
+      // Catch invocation failures (stale action ID after a deploy, network
+      // drop) — without this they escalate to the route error boundary and
+      // replace the whole products page. See describeActionFailure.
+      try {
+        const result = await createDraftProduct();
+        if (result.ok && result.id) {
+          router.push(`/admin/products/${result.id}`);
+        } else {
+          setError(
+            result.ok
+              ? "Created draft but no id returned"
+              : result.formError ?? "Could not create draft"
+          );
+        }
+      } catch (err) {
+        setError(describeActionFailure(err));
       }
     });
   }

@@ -11,6 +11,7 @@ import {
 } from "./_actions";
 import type { ProductInput } from "@/lib/products/schema";
 import { parseDisplayPriceToPence, formatPence } from "@/lib/products/format";
+import { describeActionFailure } from "@/lib/admin/action-errors";
 import { ImageUploader } from "./_ImageUploader";
 import { ConditionReportSection } from "./_ConditionReportSection";
 import { MarginCalculator } from "./_MarginCalculator";
@@ -327,39 +328,48 @@ export default function ProductForm({
     const input = buildInput();
 
     startTransition(async () => {
-      const result = initialProduct
-        ? await updateProduct(initialProduct.id, input)
-        : await createProduct(input);
+      // The try/catch is load-bearing: if the action *invocation* throws
+      // (stale action ID after a deploy, dropped connection), an uncaught
+      // rejection here escalates to the route's error boundary and replaces
+      // the whole form — losing everything the admin typed. Catch it and
+      // surface an inline, recoverable message instead.
+      try {
+        const result = initialProduct
+          ? await updateProduct(initialProduct.id, input)
+          : await createProduct(input);
 
-      if (result.ok) {
-        // Edit mode: persist category assignments alongside the product save.
-        // Create mode redirects to the edit page, so categories get assigned
-        // on the next save (same pattern as images).
-        if (isEdit && initialProduct) {
-          const catResult = await setProductCategories(
-            initialProduct.id,
-            selectedCategoryIds
-          );
-          if (!catResult.ok && catResult.formError) {
-            // Product itself saved fine; surface a non-fatal warning.
-            setCategoriesWarning(
-              `Product saved, but categories failed: ${catResult.formError}`
+        if (result.ok) {
+          // Edit mode: persist category assignments alongside the product save.
+          // Create mode redirects to the edit page, so categories get assigned
+          // on the next save (same pattern as images).
+          if (isEdit && initialProduct) {
+            const catResult = await setProductCategories(
+              initialProduct.id,
+              selectedCategoryIds
             );
-            router.refresh();
-            return;
+            if (!catResult.ok && catResult.formError) {
+              // Product itself saved fine; surface a non-fatal warning.
+              setCategoriesWarning(
+                `Product saved, but categories failed: ${catResult.formError}`
+              );
+              router.refresh();
+              return;
+            }
           }
+
+          if (!isEdit && result.id) {
+            router.push(`/admin/products/${result.id}`);
+          } else {
+            router.refresh();
+          }
+          return;
         }
 
-        if (!isEdit && result.id) {
-          router.push(`/admin/products/${result.id}`);
-        } else {
-          router.refresh();
-        }
-        return;
+        if (result.fieldErrors) setFieldErrors(result.fieldErrors);
+        if (result.formError) setFormError(result.formError);
+      } catch (err) {
+        setFormError(describeActionFailure(err));
       }
-
-      if (result.fieldErrors) setFieldErrors(result.fieldErrors);
-      if (result.formError) setFormError(result.formError);
     });
   }
 
@@ -367,11 +377,15 @@ export default function ProductForm({
     if (!initialProduct) return;
     if (!confirm("Archive this product? It will be hidden from the customer site.")) return;
     startTransition(async () => {
-      const result = await archiveProduct(initialProduct.id);
-      if (!result.ok && result.formError) {
-        setFormError(result.formError);
-      } else {
-        router.push("/admin/products");
+      try {
+        const result = await archiveProduct(initialProduct.id);
+        if (!result.ok && result.formError) {
+          setFormError(result.formError);
+        } else {
+          router.push("/admin/products");
+        }
+      } catch (err) {
+        setFormError(describeActionFailure(err));
       }
     });
   }
