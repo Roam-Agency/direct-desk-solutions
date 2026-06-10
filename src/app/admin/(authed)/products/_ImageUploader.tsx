@@ -51,6 +51,7 @@ import {
 } from "./_ai-actions";
 import { SendToPhoneModal } from "./_SendToPhoneModal";
 import { createClient as createBrowserSupabase } from "@/lib/supabase/client";
+import { cloudinaryThumb } from "@/lib/cloudinary/transform";
 
 /**
  * Image uploader for the product form.
@@ -507,7 +508,7 @@ function SortableThumbnail({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={img.cloudinary_url}
+          src={cloudinaryThumb(img.cloudinary_url)}
           alt={img.alt_text || ""}
           className="h-full w-full object-cover"
           draggable={false}

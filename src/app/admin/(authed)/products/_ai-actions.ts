@@ -15,6 +15,7 @@ import {
   type CategoryForPrompt,
   type ProductContextForPrompt,
 } from "@/lib/ai/prompts";
+import { cloudinaryForVision } from "@/lib/cloudinary/transform";
 
 /**
  * Server Actions for AI-powered image metadata suggestion.
@@ -120,8 +121,11 @@ export async function suggestImageMetadata(
             {
               type: "image",
               source: {
+                // Deliver a transformed derivative, never the raw original:
+                // Cloudinary 403s the un-derived original, which is what made
+                // Claude's server-side fetch of this URL fail.
                 type: "url",
-                url: image.cloudinary_url,
+                url: cloudinaryForVision(image.cloudinary_url),
               },
             },
             {
