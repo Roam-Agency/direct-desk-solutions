@@ -45,6 +45,13 @@ interface ProductFormProps {
   initialReport?: ConditionReportRow | null;
   /** Items belonging to the report. Empty if no report yet. */
   initialReportItems?: ConditionReportItemRow[];
+  /**
+   * True when we've just arrived here from a successful create (the
+   * create flow redirects to this edit page with ?saved=1). Seeds the
+   * post-save success state so the "Go to products" affordance shows on
+   * arrival, matching the in-place edit-save experience.
+   */
+  justSaved?: boolean;
 }
 
 /**
@@ -67,6 +74,7 @@ export default function ProductForm({
   initialReportItems = [],
   allCategories = [],
   initialCategoryIds = [],
+  justSaved = false,
 }: ProductFormProps) {
   const router = useRouter();
   const isEdit = Boolean(initialProduct);
@@ -78,6 +86,12 @@ export default function ProductForm({
   const [categoriesWarning, setCategoriesWarning] = useState<string | null>(
     null
   );
+  // Set true after a successful save. The admin's natural next step after
+  // saving a (new or used) product is to check how it lands in the
+  // catalogue list — live vs draft — so on success we surface an explicit
+  // "Go to products" affordance. Cleared the moment the form is edited
+  // again (onInput on the <form>) or a fresh save starts.
+  const [saved, setSaved] = useState(justSaved);
 
   // Track whether the visible bottom action row is in the viewport.
   // When it scrolls off, we render a fixed-position sticky save bar at
@@ -324,6 +338,7 @@ export default function ProductForm({
     e.preventDefault();
     setFieldErrors({});
     setFormError(null);
+    setSaved(false);
 
     const input = buildInput();
 
@@ -352,14 +367,19 @@ export default function ProductForm({
               setCategoriesWarning(
                 `Product saved, but categories failed: ${catResult.formError}`
               );
+              setSaved(true);
               router.refresh();
               return;
             }
           }
 
           if (!isEdit && result.id) {
-            router.push(`/admin/products/${result.id}`);
+            // Create mode redirects to the freshly-created product's edit
+            // page; flag the save so that page shows the success state +
+            // "Go to products" affordance on arrival.
+            router.push(`/admin/products/${result.id}?saved=1`);
           } else {
+            setSaved(true);
             router.refresh();
           }
           return;
@@ -408,10 +428,33 @@ export default function ProductForm({
     !initialProduct?.published_at;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-10">
+    <form
+      onSubmit={handleSubmit}
+      // Editing anything after a save clears the "saved" confirmation so the
+      // success banner / Go-to-products affordance never lingers over a form
+      // that's since been changed.
+      onInput={() => {
+        if (saved) setSaved(false);
+      }}
+      className="space-y-10"
+    >
       {formError && (
         <div className="border-l-2 border-brand-red bg-paper px-4 py-3 text-sm text-ink">
           {formError}
+        </div>
+      )}
+
+      {saved && (
+        <div className="flex flex-col gap-3 border-l-2 border-emerald-600 bg-emerald-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm font-bold text-emerald-800">
+            ✓ Product saved.
+          </p>
+          <Link
+            href="/admin/products"
+            className="shrink-0 bg-ink px-5 py-2.5 text-center text-xs font-bold uppercase tracking-widest text-paper transition hover:bg-brand-red"
+          >
+            Go to products →
+          </Link>
         </div>
       )}
 
@@ -838,6 +881,15 @@ export default function ProductForm({
                   View on site →
                 </Link>
               )}
+            {saved && (
+              <Link
+                href="/admin/products"
+                tabIndex={isBottomVisible ? -1 : undefined}
+                className="shrink-0 border border-ink px-5 py-3 text-center text-xs font-bold uppercase tracking-widest text-ink transition hover:border-brand-red hover:text-brand-red"
+              >
+                Go to products →
+              </Link>
+            )}
             <button
               type="submit"
               disabled={isPending}
@@ -865,6 +917,14 @@ export default function ProductForm({
           >
             {isPending ? "Saving…" : isEdit ? "Save changes" : "Create product"}
           </button>
+          {saved && (
+            <Link
+              href="/admin/products"
+              className="self-center border border-ink px-5 py-3 text-xs font-bold uppercase tracking-widest text-ink transition hover:border-brand-red hover:text-brand-red"
+            >
+              Go to products →
+            </Link>
+          )}
           {isEdit &&
             initialProduct?.status === "live" &&
             initialProduct?.slug && (
