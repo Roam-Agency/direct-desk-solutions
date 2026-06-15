@@ -13,10 +13,12 @@ import {
  * Dashboard hero drop zone — the primary "add product" entry point.
  *
  * Photo-first flow, scaled up for multi-photo:
- *   - 1 photo dropped → create draft, attach, redirect to that edit page
- *   - N photos dropped → create N drafts in parallel, upload sequentially
- *     per photo, redirect to /admin/products?status=draft (drafts list
- *     already sorts by updated_at DESC, fresh ones at top)
+ *   - Any clean success (1 or N photos) → show an in-zone success
+ *     confirmation, then auto-redirect (~1.5s) to
+ *     /admin/products?status=draft so the admin sees the new drafts land.
+ *     The drafts list sorts by updated_at DESC, so fresh ones sit at top.
+ *     Single and multi photo share one destination — consistent, and the
+ *     admin is never left guessing whether the upload worked.
  *   - Partial success (e.g. 3 of 5) → stay on dashboard with summary,
  *     so the admin sees what failed and can retry
  *
@@ -57,6 +59,11 @@ export function DashboardDropZone() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [progress, setProgress] = useState<Progress | null>(null);
+  // Non-null once a batch finishes with every photo succeeding and zero
+  // errors. Drives the success confirmation shown in the zone before the
+  // auto-redirect to the drafts list fires. Partial/failed batches leave
+  // this null and fall through to the summary panel below the zone.
+  const [succeededCount, setSucceededCount] = useState<number | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function validateFile(file: File): string | null {
@@ -151,6 +158,9 @@ export function DashboardDropZone() {
     }
 
     startTransition(async () => {
+      // Clear any success state left over from a previous batch (e.g. the
+      // admin drops a second set before the first redirect lands).
+      setSucceededCount(null);
       setProgress({
         total: validFiles.length,
         done: 0,
@@ -184,15 +194,16 @@ export function DashboardDropZone() {
       // Routing decision based on result:
       //  - 0 successes → stay, show errors
       //  - partial    → stay, show success count + errors
-      //  - all clean, 1 success → go to that edit page
-      //  - all clean, 2+ successes → go to drafts list
+      //  - all clean  → show a success confirmation in the zone, then
+      //                 auto-redirect to the drafts list so the admin sees
+      //                 the new drafts land. Applies to single and multi
+      //                 photo batches alike — one consistent destination.
       if (successIds.length === 0) return;
       if (errors.length > 0) return; // partial — let admin review
-      if (successIds.length === 1) {
-        router.push(`/admin/products/${successIds[0]}`);
-      } else {
+      setSucceededCount(successIds.length);
+      setTimeout(() => {
         router.push("/admin/products?status=draft");
-      }
+      }, 1500);
     });
   }
 
@@ -228,16 +239,26 @@ export function DashboardDropZone() {
     }
   }
 
+  // The zone is "busy" both while uploads run and during the brief success
+  // confirmation that precedes the auto-redirect. Clicks and keyboard
+  // activation are suppressed throughout so a stray click can't reopen the
+  // file picker mid-redirect.
+  const isSucceeded = succeededCount !== null;
+  const busy = isPending || isSucceeded;
+
   const zoneClass = [
     "flex flex-col items-center justify-center",
     "border-2 border-dashed",
     "px-6 py-12 min-h-[200px]",
     "text-center",
     "transition cursor-pointer",
-    isDragging
-      ? "border-brand-red bg-brand-red/5"
-      : "border-ink/30 bg-paper hover:border-ink hover:bg-rule/20",
+    isSucceeded
+      ? "border-green-600 bg-green-600/5"
+      : isDragging
+        ? "border-brand-red bg-brand-red/5"
+        : "border-ink/30 bg-paper hover:border-ink hover:bg-rule/20",
     isPending ? "cursor-wait" : "",
+    isSucceeded ? "cursor-default" : "",
   ].join(" ");
 
   const inProgressLabel = progress
@@ -251,9 +272,9 @@ export function DashboardDropZone() {
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        onClick={isPending ? undefined : handleBrowse}
+        onClick={busy ? undefined : handleBrowse}
         onKeyDown={(e) => {
-          if ((e.key === "Enter" || e.key === " ") && !isPending) {
+          if ((e.key === "Enter" || e.key === " ") && !busy) {
             e.preventDefault();
             handleBrowse();
           }
@@ -261,7 +282,7 @@ export function DashboardDropZone() {
         role="button"
         tabIndex={0}
         aria-label="Drop product photos to create drafts"
-        aria-busy={isPending}
+        aria-busy={busy}
       >
         <input
           ref={inputRef}
@@ -273,7 +294,33 @@ export function DashboardDropZone() {
           aria-hidden
         />
 
-        {isPending && progress ? (
+        {isSucceeded ? (
+          <>
+            <svg
+              width="40"
+              height="40"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="text-green-600"
+              aria-hidden
+            >
+              <path
+                d="M20 6L9 17l-5-5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <p className="mt-4 text-base font-bold text-ink">
+              {succeededCount} draft{succeededCount === 1 ? "" : "s"} created
+              from your photo{succeededCount === 1 ? "" : "s"}
+            </p>
+            <p className="mt-1 text-xs text-ink/60">
+              Taking you to your products…
+            </p>
+          </>
+        ) : isPending && progress ? (
           <>
             <p className="text-xs font-bold uppercase tracking-widest text-ink">
               {inProgressLabel}
@@ -310,9 +357,11 @@ export function DashboardDropZone() {
         )}
       </div>
 
-      {/* Partial-success or all-failed summary. Renders below the zone
-          when uploads have finished but routing was suppressed. */}
-      {!isPending && progress && (progress.errors.length > 0 || progress.successCount > 0) ? (
+      {/* Partial-success or all-failed summary. Renders below the zone when
+          uploads have finished but routing was suppressed. Suppressed on a
+          clean success — that path shows the in-zone confirmation above and
+          auto-redirects, so the summary panel would be redundant. */}
+      {!isPending && !isSucceeded && progress && (progress.errors.length > 0 || progress.successCount > 0) ? (
         <div className="mt-3 border-l-2 border-brand-red bg-paper px-4 py-3">
           {progress.successCount > 0 ? (
             <p className="text-xs">
