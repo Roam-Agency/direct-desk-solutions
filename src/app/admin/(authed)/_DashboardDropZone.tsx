@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -8,33 +8,34 @@ import {
   generateUploadSignature,
   attachImage,
 } from "./products/_actions";
+import { downscaleImage } from "@/lib/images/downscale";
 
 /**
  * Dashboard hero drop zone — the primary "add product" entry point.
  *
- * Photo-first flow, scaled up for multi-photo:
- *   - Any clean success (1 or N photos) → show an in-zone success
- *     confirmation, then auto-redirect (~1.5s) to
- *     /admin/products?status=draft so the admin sees the new drafts land.
- *     The drafts list sorts by updated_at DESC, so fresh ones sit at top.
- *     Single and multi photo share one destination — consistent, and the
- *     admin is never left guessing whether the upload worked.
- *   - Partial success (e.g. 3 of 5) → stay on dashboard with summary,
- *     so the admin sees what failed and can retry
+ * Photo-first flow, optimised for speed and clear feedback:
+ *   - Each dropped photo creates its own draft, uploads to Cloudinary, and
+ *     attaches the image. Drafts are independent, so the pipeline runs up to
+ *     MAX_CONCURRENT photos at once rather than one-at-a-time — a batch of
+ *     three no longer takes three times as long.
+ *   - Before upload, oversized photos are downscaled in the browser
+ *     (see @/lib/images/downscale). Phone photos are often 5–12MB; shrinking
+ *     them is the single biggest cut to the wait, and the storefront resizes
+ *     on delivery anyway.
+ *   - Each photo shows a live progress bar (XHR upload events), so a slow
+ *     transfer reads as "working", never as "hung".
+ *   - Any clean success (1 or N photos) → in-zone success confirmation, then
+ *     auto-redirect (~1.5s) to /admin/products?status=draft so the admin sees
+ *     the new drafts land. Single and multi photo share one destination.
+ *   - Partial success (e.g. 3 of 5) → stay on dashboard with a summary plus
+ *     per-photo error rows, so the admin sees what failed and can retry.
  *
- * Sequential uploads (rather than 3-at-a-time concurrency like
- * _ImageUploader.tsx) keeps the implementation simple. Typical admin
- * use is a handful of photos at a time — 10 photos × 3s each = 30s,
- * acceptable. If real usage shows bigger batches, the next iteration
- * can lift the concurrency pattern from _ImageUploader.
- *
- * AI suggestion is NOT triggered from this entry point in v1.
- * `suggestImageMetadata` is wired into _ImageUploader.tsx itself, not
- * into `attachImage`, so a direct attach skips it. Follow-up: have the
- * edit page auto-trigger AI for any image lacking a suggestion on mount.
+ * AI suggestion is NOT triggered from this entry point; the edit page picks
+ * up any image lacking a suggestion on mount.
  */
 
 const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024; // 15MB — matches _ImageUploader.tsx
+const MAX_CONCURRENT_UPLOADS = 3; // matches _ImageUploader.tsx
 const ACCEPTED_MIME_TYPES = [
   "image/jpeg",
   "image/png",
@@ -47,164 +48,246 @@ type UploadOutcome =
   | { ok: true; productId: string }
   | { ok: false; error: string };
 
-type Progress = {
-  total: number;
-  done: number;
-  errors: string[];
-  successCount: number;
+type TaskStatus =
+  | "pending"
+  | "preparing"
+  | "uploading"
+  | "saving"
+  | "done"
+  | "error";
+
+type FileTask = {
+  // Stable client-side id for tracking this file through state.
+  clientId: string;
+  name: string;
+  file: File;
+  status: TaskStatus;
+  progress: number; // 0-100
+  error?: string;
 };
+
+function makeClientId() {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+/**
+ * POST a file to Cloudinary via XMLHttpRequest so we get upload-progress
+ * events (fetch() does not surface them). Resolves rather than rejects on
+ * failure so the caller handles every outcome the same way.
+ */
+function uploadToCloudinary(
+  cloudName: string,
+  formData: FormData,
+  onProgress: (pct: number) => void
+): Promise<
+  | { ok: true; publicId: string; secureUrl: string }
+  | { ok: false; error: string }
+> {
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`);
+    xhr.upload.addEventListener("progress", (e) => {
+      if (e.lengthComputable) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    });
+    xhr.addEventListener("load", () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const parsed = JSON.parse(xhr.responseText);
+          if (parsed.public_id && parsed.secure_url) {
+            resolve({
+              ok: true,
+              publicId: parsed.public_id,
+              secureUrl: parsed.secure_url,
+            });
+          } else {
+            resolve({ ok: false, error: "Cloudinary response missing fields" });
+          }
+        } catch {
+          resolve({ ok: false, error: "Could not parse Cloudinary response" });
+        }
+      } else {
+        resolve({ ok: false, error: `Cloudinary upload failed (HTTP ${xhr.status})` });
+      }
+    });
+    xhr.addEventListener("error", () =>
+      resolve({ ok: false, error: "Network error during upload" })
+    );
+    xhr.send(formData);
+  });
+}
 
 export function DashboardDropZone() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [progress, setProgress] = useState<Progress | null>(null);
+  const [tasks, setTasks] = useState<FileTask[]>([]);
+  const [isRunning, setIsRunning] = useState(false);
   // Non-null once a batch finishes with every photo succeeding and zero
   // errors. Drives the success confirmation shown in the zone before the
-  // auto-redirect to the drafts list fires. Partial/failed batches leave
-  // this null and fall through to the summary panel below the zone.
+  // auto-redirect to the drafts list fires. Partial/failed batches leave this
+  // null and fall through to the summary panel below the zone.
   const [succeededCount, setSucceededCount] = useState<number | null>(null);
-  const [isPending, startTransition] = useTransition();
 
   function validateFile(file: File): string | null {
     if (!ACCEPTED_MIME_TYPES.includes(file.type)) {
-      return `${file.name}: unsupported type (${file.type || "unknown"})`;
+      return `Unsupported type (${file.type || "unknown"})`;
     }
     if (file.size > MAX_FILE_SIZE_BYTES) {
-      return `${file.name}: too large (${(file.size / 1024 / 1024).toFixed(1)}MB > 15MB)`;
+      return `Too large (${(file.size / 1024 / 1024).toFixed(1)}MB > 15MB)`;
     }
     return null;
   }
 
-  async function processOneFile(file: File): Promise<UploadOutcome> {
+  function updateTask(clientId: string, patch: Partial<FileTask>) {
+    setTasks((current) =>
+      current.map((t) => (t.clientId === clientId ? { ...t, ...patch } : t))
+    );
+  }
+
+  async function processOneFile(task: FileTask): Promise<UploadOutcome> {
+    // 0. Downscale oversized photos in the browser. Never fatal — falls back
+    //    to the original file on any failure (see downscaleImage).
+    updateTask(task.clientId, { status: "preparing", progress: 0 });
+    let uploadFile = task.file;
+    try {
+      const { file } = await downscaleImage(task.file);
+      uploadFile = file;
+    } catch {
+      uploadFile = task.file;
+    }
+
     // 1. Create draft skeleton row.
+    updateTask(task.clientId, { status: "uploading", progress: 3 });
     const draftResult = await createDraftProduct();
     if (!draftResult.ok || !draftResult.id) {
       const reason = draftResult.ok
         ? "draft created but no id returned"
         : draftResult.formError ?? "could not create draft";
-      return { ok: false, error: `${file.name}: ${reason}` };
+      updateTask(task.clientId, { status: "error", error: reason });
+      return { ok: false, error: `${task.name}: ${reason}` };
     }
     const productId = draftResult.id;
 
     // 2. Get signed Cloudinary payload bound to this product.
     const sig = await generateUploadSignature(productId);
     if (!sig.ok) {
-      return { ok: false, error: `${file.name}: signature failed (${sig.formError})` };
+      const reason = `signature failed (${sig.formError})`;
+      updateTask(task.clientId, { status: "error", error: reason });
+      return { ok: false, error: `${task.name}: ${reason}` };
     }
 
     // 3. POST file directly to Cloudinary. Bytes never touch our server.
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("file", uploadFile);
     formData.append("api_key", sig.apiKey);
     formData.append("timestamp", String(sig.timestamp));
     formData.append("signature", sig.signature);
     formData.append("upload_preset", sig.uploadPreset);
     formData.append("folder", sig.folder);
 
-    let cloudinaryData: { public_id?: string; secure_url?: string };
-    try {
-      const response = await fetch(
-        `https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`,
-        { method: "POST", body: formData }
-      );
-      if (!response.ok) {
-        return { ok: false, error: `${file.name}: Cloudinary upload failed (HTTP ${response.status})` };
-      }
-      cloudinaryData = await response.json();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "network error";
-      return { ok: false, error: `${file.name}: ${msg}` };
-    }
-
-    if (!cloudinaryData.public_id || !cloudinaryData.secure_url) {
-      return { ok: false, error: `${file.name}: Cloudinary response missing fields` };
+    const uploaded = await uploadToCloudinary(sig.cloudName, formData, (pct) => {
+      // Reserve 0-3 for prep and 97-100 for attach; map bytes into 3-95.
+      updateTask(task.clientId, { progress: 3 + Math.round(pct * 0.92) });
+    });
+    if (!uploaded.ok) {
+      updateTask(task.clientId, { status: "error", error: uploaded.error });
+      return { ok: false, error: `${task.name}: ${uploaded.error}` };
     }
 
     // 4. Persist into product_images.
+    updateTask(task.clientId, { status: "saving", progress: 97 });
     const attachResult = await attachImage({
       productId,
-      publicId: cloudinaryData.public_id,
-      url: cloudinaryData.secure_url,
+      publicId: uploaded.publicId,
+      url: uploaded.secureUrl,
     });
     if (!attachResult.ok) {
-      return { ok: false, error: `${file.name}: attach failed (${attachResult.formError})` };
+      const reason = `attach failed (${attachResult.formError})`;
+      updateTask(task.clientId, { status: "error", error: reason });
+      return { ok: false, error: `${task.name}: ${reason}` };
     }
 
+    updateTask(task.clientId, { status: "done", progress: 100 });
     return { ok: true, productId };
+  }
+
+  /**
+   * Run the per-file pipeline across `validTasks` with at most
+   * MAX_CONCURRENT_UPLOADS in flight. A fixed pool of workers pulls from a
+   * shared cursor — the JS event loop makes the cursor increment and the
+   * result-array pushes safe without locks.
+   */
+  async function runBatch(
+    validTasks: FileTask[],
+    successIds: string[],
+    errors: string[]
+  ) {
+    let cursor = 0;
+    const workerCount = Math.min(MAX_CONCURRENT_UPLOADS, validTasks.length);
+    const workers = Array.from({ length: workerCount }, async () => {
+      while (cursor < validTasks.length) {
+        const task = validTasks[cursor];
+        cursor += 1;
+        const outcome = await processOneFile(task);
+        if (outcome.ok) successIds.push(outcome.productId);
+        else errors.push(outcome.error);
+      }
+    });
+    await Promise.all(workers);
   }
 
   function handleFiles(files: FileList | File[]) {
     const fileArray = Array.from(files);
     if (fileArray.length === 0) return;
 
-    const validationErrors: string[] = [];
-    const validFiles: File[] = [];
-    for (const file of fileArray) {
+    const newTasks: FileTask[] = fileArray.map((file) => {
       const err = validateFile(file);
-      if (err) validationErrors.push(err);
-      else validFiles.push(file);
-    }
+      return {
+        clientId: makeClientId(),
+        name: file.name,
+        file,
+        status: err ? "error" : "pending",
+        progress: 0,
+        error: err ?? undefined,
+      };
+    });
 
-    if (validFiles.length === 0) {
-      // Nothing to upload — just report validation errors.
-      setProgress({
-        total: 0,
-        done: 0,
-        errors: validationErrors,
-        successCount: 0,
-      });
+    setSucceededCount(null);
+    setTasks(newTasks);
+
+    const validTasks = newTasks.filter((t) => t.status !== "error");
+    const validationErrors = newTasks
+      .filter((t) => t.status === "error")
+      .map((t) => `${t.name}: ${t.error}`);
+
+    if (validTasks.length === 0) {
+      // Nothing to upload — the invalid rows render their own errors.
       return;
     }
 
-    startTransition(async () => {
-      // Clear any success state left over from a previous batch (e.g. the
-      // admin drops a second set before the first redirect lands).
-      setSucceededCount(null);
-      setProgress({
-        total: validFiles.length,
-        done: 0,
-        errors: validationErrors,
-        successCount: 0,
-      });
-
+    setIsRunning(true);
+    void (async () => {
       const successIds: string[] = [];
       const errors: string[] = [...validationErrors];
 
-      // Sequential — one upload at a time. Predictable, no race surface.
-      for (const file of validFiles) {
-        const result = await processOneFile(file);
-        if (result.ok) {
-          successIds.push(result.productId);
-        } else {
-          errors.push(result.error);
-        }
-        setProgress((p) =>
-          p
-            ? {
-                ...p,
-                done: p.done + 1,
-                errors,
-                successCount: successIds.length,
-              }
-            : null
-        );
-      }
+      await runBatch(validTasks, successIds, errors);
 
-      // Routing decision based on result:
-      //  - 0 successes → stay, show errors
-      //  - partial    → stay, show success count + errors
-      //  - all clean  → show a success confirmation in the zone, then
-      //                 auto-redirect to the drafts list so the admin sees
-      //                 the new drafts land. Applies to single and multi
-      //                 photo batches alike — one consistent destination.
+      setIsRunning(false);
+
+      // Routing decision:
+      //  - 0 successes → stay, errors shown per-file + in summary
+      //  - partial     → stay, summary + per-file errors so admin can retry
+      //  - all clean   → show success confirmation, then auto-redirect to the
+      //                  drafts list (single and multi share one destination)
       if (successIds.length === 0) return;
-      if (errors.length > 0) return; // partial — let admin review
+      if (errors.length > 0) return;
       setSucceededCount(successIds.length);
       setTimeout(() => {
         router.push("/admin/products?status=draft");
       }, 1500);
-    });
+    })();
   }
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>) {
@@ -239,12 +322,12 @@ export function DashboardDropZone() {
     }
   }
 
-  // The zone is "busy" both while uploads run and during the brief success
+  // The zone is "busy" while uploads run and during the brief success
   // confirmation that precedes the auto-redirect. Clicks and keyboard
   // activation are suppressed throughout so a stray click can't reopen the
-  // file picker mid-redirect.
+  // file picker mid-batch or mid-redirect.
   const isSucceeded = succeededCount !== null;
-  const busy = isPending || isSucceeded;
+  const busy = isRunning || isSucceeded;
 
   const zoneClass = [
     "flex flex-col items-center justify-center",
@@ -257,13 +340,22 @@ export function DashboardDropZone() {
       : isDragging
         ? "border-brand-red bg-brand-red/5"
         : "border-ink/30 bg-paper hover:border-ink hover:bg-rule/20",
-    isPending ? "cursor-wait" : "",
+    isRunning ? "cursor-wait" : "",
     isSucceeded ? "cursor-default" : "",
   ].join(" ");
 
-  const inProgressLabel = progress
-    ? `Uploading ${Math.min(progress.done + 1, progress.total)} of ${progress.total}…`
-    : "Uploading…";
+  // Aggregate progress for the in-zone label while running.
+  const settledCount = tasks.filter(
+    (t) => t.status === "done" || t.status === "error"
+  ).length;
+  const inProgressLabel = `Uploading ${Math.min(
+    settledCount + 1,
+    tasks.length
+  )} of ${tasks.length}…`;
+
+  // Final-state counts (used for the summary panel once the batch settles).
+  const doneCount = tasks.filter((t) => t.status === "done").length;
+  const errorCount = tasks.filter((t) => t.status === "error").length;
 
   return (
     <div>
@@ -320,13 +412,13 @@ export function DashboardDropZone() {
               Taking you to your products…
             </p>
           </>
-        ) : isPending && progress ? (
+        ) : isRunning ? (
           <>
             <p className="text-xs font-bold uppercase tracking-widest text-ink">
               {inProgressLabel}
             </p>
             <p className="mt-2 text-xs text-ink/60">
-              Drafts being created — hang tight.
+              Optimising and uploading your photos — progress below.
             </p>
           </>
         ) : (
@@ -357,16 +449,66 @@ export function DashboardDropZone() {
         )}
       </div>
 
-      {/* Partial-success or all-failed summary. Renders below the zone when
-          uploads have finished but routing was suppressed. Suppressed on a
-          clean success — that path shows the in-zone confirmation above and
-          auto-redirects, so the summary panel would be redundant. */}
-      {!isPending && !isSucceeded && progress && (progress.errors.length > 0 || progress.successCount > 0) ? (
+      {/* Per-photo progress + error rows. Visible while uploading and after a
+          partial/failed batch so the admin can see exactly which photo failed.
+          Hidden on a clean success — the in-zone confirmation covers it and we
+          redirect immediately. */}
+      {tasks.length > 0 && !isSucceeded ? (
+        <ul className="mt-3 space-y-2">
+          {tasks.map((t) => (
+            <li
+              key={t.clientId}
+              className="flex items-center gap-4 border border-rule bg-paper px-4 py-3"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold text-ink">{t.name}</p>
+                {t.status === "preparing" && (
+                  <p className="mt-1 text-xs uppercase tracking-widest text-ink/40">
+                    Optimising…
+                  </p>
+                )}
+                {t.status === "uploading" && (
+                  <div className="mt-1.5 h-1 w-full bg-rule">
+                    <div
+                      className="h-1 bg-brand-red transition-all"
+                      style={{ width: `${t.progress}%` }}
+                    />
+                  </div>
+                )}
+                {t.status === "saving" && (
+                  <p className="mt-1 text-xs uppercase tracking-widest text-ink/60">
+                    Saving…
+                  </p>
+                )}
+                {t.status === "done" && (
+                  <p className="mt-1 text-xs uppercase tracking-widest text-green-700">
+                    Draft created
+                  </p>
+                )}
+                {t.status === "pending" && (
+                  <p className="mt-1 text-xs uppercase tracking-widest text-ink/40">
+                    Queued
+                  </p>
+                )}
+                {t.status === "error" && (
+                  <p className="mt-1 text-xs font-bold text-brand-red">
+                    {t.error ?? "Failed"}
+                  </p>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {/* Summary banner once a partial/failed batch settles. Suppressed while
+          running and on a clean success (which redirects). */}
+      {!isRunning && !isSucceeded && (doneCount > 0 || errorCount > 0) ? (
         <div className="mt-3 border-l-2 border-brand-red bg-paper px-4 py-3">
-          {progress.successCount > 0 ? (
+          {doneCount > 0 ? (
             <p className="text-xs">
               <span className="font-bold uppercase tracking-widest text-ink">
-                {progress.successCount} draft{progress.successCount === 1 ? "" : "s"} created
+                {doneCount} draft{doneCount === 1 ? "" : "s"} created
               </span>
               <span className="ml-2 text-ink/60">
                 ·{" "}
@@ -379,17 +521,10 @@ export function DashboardDropZone() {
               </span>
             </p>
           ) : null}
-          {progress.errors.length > 0 ? (
-            <>
-              <p className="mt-1 text-xs font-bold uppercase tracking-widest text-brand-red">
-                {progress.errors.length} failed
-              </p>
-              <ul className="mt-2 space-y-1 text-xs text-ink/70">
-                {progress.errors.map((err, i) => (
-                  <li key={i}>{err}</li>
-                ))}
-              </ul>
-            </>
+          {errorCount > 0 ? (
+            <p className="mt-1 text-xs font-bold uppercase tracking-widest text-brand-red">
+              {errorCount} failed — see above
+            </p>
           ) : null}
         </div>
       ) : null}
