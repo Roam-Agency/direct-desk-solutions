@@ -38,10 +38,16 @@ export default async function UsedProductsPage({
 
   const [products, brands] = await Promise.all([
     listLiveProducts({ condition: "used", sortBy: sort, brandSlugs }),
-    listBrandsWithCounts(),
+    listBrandsWithCounts({ condition: "used" }),
   ]);
 
-  const brandOptions = brands.map((b) => ({ value: b.slug, label: b.name }));
+  // Only offer brands with live used stock — the imported catalogue has
+  // 100+ brand categories, and a chip for each buries the products.
+  // Selected slugs stay visible even at zero count so a stale URL
+  // filter can still be untoggled.
+  const brandOptions = brands
+    .filter((b) => b.live_product_count > 0 || brandSlugs.includes(b.slug))
+    .map((b) => ({ value: b.slug, label: b.name }));
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-8 sm:py-12 lg:py-16">

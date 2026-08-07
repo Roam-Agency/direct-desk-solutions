@@ -16,9 +16,18 @@
  * Visual: horizontal-scroll chip strip on mobile, wraps to a row at
  * sm+. Bleeds to viewport edges via negative margin + matching px so
  * the leading/trailing chips can be partly visible (signals scrollability).
+ *
+ * Long option lists collapse to the first COLLAPSED_CHIP_LIMIT chips
+ * behind a "+N more" toggle, so the strip never pushes the product
+ * grid below the fold. Selected chips are always kept visible while
+ * collapsed so an active filter can be untoggled without expanding.
  */
 
+import { useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+
+// Roughly one row of chips on a desktop viewport.
+const COLLAPSED_CHIP_LIMIT = 12;
 
 type ChipOption = {
   value: string;
@@ -43,6 +52,7 @@ export default function FilterChips(props: FilterChipsProps) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
+  const [expanded, setExpanded] = useState(false);
 
   function navigateWith(mutate: (next: URLSearchParams) => void) {
     const next = new URLSearchParams(params.toString());
@@ -92,6 +102,21 @@ export default function FilterChips(props: FilterChipsProps) {
   const selectedCount =
     props.mode === "brand" ? props.selected.length : props.selected ? 1 : 0;
 
+  // Collapse long option lists behind a "+N more" toggle. While
+  // collapsed, selected chips outside the visible head are appended so
+  // an active filter is never hidden from its own un-toggle.
+  const overflows = props.options.length > COLLAPSED_CHIP_LIMIT;
+  let visibleOptions = props.options;
+  if (overflows && !expanded) {
+    visibleOptions = [
+      ...props.options.slice(0, COLLAPSED_CHIP_LIMIT),
+      ...props.options
+        .slice(COLLAPSED_CHIP_LIMIT)
+        .filter((opt) => isActive(opt.value)),
+    ];
+  }
+  const hiddenCount = props.options.length - visibleOptions.length;
+
   return (
     <div>
       {/* Mobile-only hint row: makes it obvious the strip filters + scrolls,
@@ -117,7 +142,7 @@ export default function FilterChips(props: FilterChipsProps) {
           scroll on mobile; it's removed at sm+ where chips wrap. */}
       <div className="relative">
         <div className="flex items-center gap-2 overflow-x-auto -mx-6 px-6 pb-1 sm:flex-wrap sm:mx-0 sm:px-0 sm:overflow-visible [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {props.options.map((opt) => {
+          {visibleOptions.map((opt) => {
             const active = isActive(opt.value);
             return (
               <button
@@ -140,6 +165,16 @@ export default function FilterChips(props: FilterChipsProps) {
               </button>
             );
           })}
+          {overflows && (
+            <button
+              type="button"
+              onClick={() => setExpanded((e) => !e)}
+              aria-expanded={expanded}
+              className="shrink-0 px-4 py-2.5 text-[11px] uppercase tracking-[0.18em] font-bold border border-dashed border-rule text-ink/60 hover:border-ink hover:text-ink transition-colors whitespace-nowrap"
+            >
+              {expanded ? "Show fewer" : `+${hiddenCount} more`}
+            </button>
+          )}
           {/* Inline Clear at sm+ (the mobile hint row has its own). */}
           {hasSelection && (
             <button

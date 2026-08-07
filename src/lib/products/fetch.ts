@@ -488,12 +488,22 @@ export type BrandWithCount = CategoryRow & {
  * List all active brand categories, sorted by sort_order then name,
  * with a count of live products attached to each.
  *
+ * Pass opts.condition to scope the counts to live products of that
+ * condition — the used/new listing pages use this so their filter
+ * chips only offer brands that can actually match (the imported
+ * catalogue has 100+ brand categories; offering them all buries the
+ * products below a wall of chips).
+ *
  * The count reflects the current state of the catalogue — a brand with
  * zero live products is included in the result (rendered as "Coming
  * soon" on the index). Hiding zero-count brands would mean discovering
  * them requires knowing the URL, which kills the editorial intent.
+ * Callers that don't want zero-count brands filter on
+ * live_product_count themselves.
  */
-export async function listBrandsWithCounts(): Promise<BrandWithCount[]> {
+export async function listBrandsWithCounts(opts?: {
+  condition?: "new" | "used";
+}): Promise<BrandWithCount[]> {
   const supabase = await createClient();
 
   // Fetch the brand categories first. Two queries is cleaner here than
@@ -518,11 +528,17 @@ export async function listBrandsWithCounts(): Promise<BrandWithCount[]> {
   // for the join, grouped in JS — simpler than an SQL count(*)+group_by
   // through supabase-js's API.
   const brandIds = brands.map((b) => b.id);
-  const { data: joins, error: joinsError } = await supabase
+  const joinsQuery = supabase
     .from("product_categories")
-    .select("category_id, product:products!inner(status)")
+    .select("category_id, product:products!inner(status, condition)")
     .in("category_id", brandIds)
     .eq("product.status", "live");
+
+  if (opts?.condition) {
+    joinsQuery.eq("product.condition", opts.condition);
+  }
+
+  const { data: joins, error: joinsError } = await joinsQuery;
 
   if (joinsError) {
     console.error("listBrandsWithCounts error (joins)", { joinsError });
