@@ -27,9 +27,15 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const hasQuery = query.length > 0;
 
   // Always fetch brands — the chip strip renders even on the empty
-  // state so the buyer can see what's filterable.
+  // state so the buyer can see what's filterable. Search spans both
+  // conditions, so counts stay unscoped, but zero-stock brands are
+  // dropped (the imported catalogue has 100+ brand categories and a
+  // chip for each buries the results). Selected slugs stay visible
+  // even at zero count so a stale URL filter can still be untoggled.
   const brands = await listBrandsWithCounts();
-  const brandOptions = brands.map((b) => ({ value: b.slug, label: b.name }));
+  const brandOptions = brands
+    .filter((b) => b.live_product_count > 0 || brandSlugs.includes(b.slug))
+    .map((b) => ({ value: b.slug, label: b.name }));
 
   let results: ProductCard[] = [];
   let fallback: ProductCard[] = [];
