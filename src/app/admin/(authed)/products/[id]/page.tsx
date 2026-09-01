@@ -5,6 +5,9 @@ import ProductForm from "../_ProductForm";
 
 interface EditProductPageProps {
   params: Promise<{ id: string }>;
+  // ?saved=1 is set by the create flow's redirect so the freshly-created
+  // product's edit page opens in the post-save success state.
+  searchParams: Promise<{ saved?: string }>;
 }
 
 /**
@@ -13,8 +16,10 @@ interface EditProductPageProps {
  */
 export default async function EditProductPage({
   params,
+  searchParams,
 }: EditProductPageProps) {
   const { id } = await params;
+  const { saved } = await searchParams;
   const supabase = await createClient();
 
   // Four parallel fetches — the product, attached images, existing
@@ -103,6 +108,7 @@ export default async function EditProductPage({
           initialCategoryIds={initialCategoryIds}
           initialReport={initialReport}
           initialReportItems={initialReportItems}
+          justSaved={saved === "1"}
         />
       </div>
     </div>
